@@ -1,0 +1,28 @@
+[project]
+name = "normalize-tabular-data"
+version = "0.1.0"
+description = "TUI for normalizing tabular data with polars"
+readme = "README.md"
+license = "BSD-2-Clause"
+license-files = ["LICENSE"]
+authors = [
+    { name = "David Mertz, Ph.D.", email = "mertz@gnosis.cx" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "gnosis-date-parser>=1.0.4",
+    "textual>=8.2.8",
+    "polars>=1.44,<2",
+    "fastexcel>=0.10",
+    "xlsxwriter>=0.9",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.25"]
+
+[project.scripts]
+normalize-tabular-data = "normalize_tabular_data:main"
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"

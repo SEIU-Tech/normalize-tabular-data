@@ -1,0 +1,168 @@
+
+import polars as pl
+import pytest
+
+from normalize_tabular_data.ops import (
+    OP_REGISTRY,
+    ColumnInfo,
+    Operation,
+    Pipeline,
+    analyze_column,
+)
+
+# --- individual operations ---------------------------------------------------
+
+def test_date_normalize():
+    op = OP_REGISTRY["date_normalize"]
+    df = op.apply(pl.DataFrame({"d": ["2022-03-22", "Mar 1, 2019", "garbage", None]}), {"column": "d"})
+    iso = [dt.strftime("%Y-%m-%dT%H:%M:%S") if dt is not None else None for dt in df["d"].to_list()]
+    assert iso == ["2022-03-22T00:00:00", "2019-03-01T00:00:00", None, None]
+    assert df["d"].dtype == pl.Datetime("ns")
+
+
+def test_trim_collapse():
+    op = OP_REGISTRY["trim_collapse"]
+    df = op.apply(
+        pl.DataFrame({"a": ["  hello   world ", "\tmulti\t brk "], "n": [1, 2]}),
+        {"columns": ["a"]},
+    )
+    assert df["a"].to_list() == ["hello world", "multi brk"]
+    assert df["n"].to_list() == [1, 2]
+
+
+def test_empty_to_null():
+    op = OP_REGISTRY["empty_to_null"]
+    df = op.apply(pl.DataFrame({"a": ["", "x", None, " "]}), {"columns": ["a"]})
+    # only genuinely empty string becomes null (a trailing-space value does not)
+    assert df["a"].to_list() == [None, "x", None, " "]
+
+
+def test_rename_columns_styles():
+    df = pl.DataFrame({"Some Name": [1], "DOB4": [2]})
+    snake = OP_REGISTRY["rename_columns"].apply(df, {"style": "snake_case"})
+    assert snake.columns == ["some_name", "dob4"]
+    slug = OP_REGISTRY["rename_columns"].apply(df, {"style": "slugify"})
+    assert slug.columns == ["some-name", "dob4"]
+
+
+def test_dedup_rows_all_and_subset():
+    op = OP_REGISTRY["dedup_rows"]
+    df = pl.DataFrame({"a": [1, 1, 2], "b": [1, 2, 2]})
+    assert op.apply(df, {"columns": ["a"], "keep": "first"}).height == 2
+    assert op.apply(df, {"columns": [], "keep": "first"}).height == 3
+
+
+def test_fill_nulls_casts_to_string():
+    op = OP_REGISTRY["fill_nulls"]
+    df = op.apply(pl.DataFrame({"a": [None, "2"]}), {"columns": ["a"], "value": "0"})
+    assert df["a"].to_list() == ["0", "2"]
+
+
+def test_drop_null_rows():
+    op = OP_REGISTRY["drop_null_rows"]
+    df = pl.DataFrame({"a": [None, "x", "y"], "b": [None, None, "1"]})
+    assert op.apply(df, {"n": 1}).height == 1  # only row 3 has no nulls
+    assert op.apply(df, {"n": 2}).height == 2
+
+
+def test_combine_columns():
+    op = OP_REGISTRY["combine_columns"]
+    df = op.apply(
+        pl.DataFrame({"first": ["Al", None], "last": ["Doe", "Doe"]}),
+        {"columns": ["first", "last"], "separator": " ", "new_name": "full"},
+    )
+    assert df["full"].to_list() == ["Al Doe", "Doe"]  # null parts skipped
+
+
+def test_split_column_unlimited():
+    op = OP_REGISTRY["split_column"]
+    df = op.apply(
+        pl.DataFrame({"name": ["Al Doe", "Bo S. Ray", "X"], "n": [1, 2, 3]}),
+        {"column": "name", "delimiter": " ", "max_parts": 0},
+    )
+    assert df.columns == ["n", "name_1", "name_2", "name_3"]
+    row = df.filter(pl.col("n") == 3).to_dicts()[0]
+    assert row["name_1"] == "X" and row["name_2"] is None
+
+
+def test_split_column_bounded():
+    op = OP_REGISTRY["split_column"]
+    df = op.apply(
+        pl.DataFrame({"name": ["Al Doe Bo", "Bo S. Ray"]}),
+        {"column": "name", "delimiter": " ", "max_parts": 2},
+    )
+    assert df.columns == ["name_1", "name_2"]
+    assert df.to_dicts()[0]["name_2"] == "Doe Bo"
+
+
+def test_unknown_column_raises_validation():
+    op = OP_REGISTRY["date_normalize"]
+    pl_df = pl.DataFrame({"d": ["2022-01-01"]})
+    pipe = Pipeline(pl_df)
+    with pytest.raises(ValueError, match="pick a column"):
+        pipe.apply(op, {"column": "nope"})
+
+
+def test_combine_requires_two_and_unique_name():
+    pipe = Pipeline(pl.DataFrame({"a": ["1"], "b": ["2"]}))
+    with pytest.raises(ValueError, match="at least 2"):
+        pipe.apply(OP_REGISTRY["combine_columns"], {"columns": ["a"], "separator": "-", "new_name": "c"})
+    with pytest.raises(ValueError, match="already exists"):
+        pipe.apply(
+            OP_REGISTRY["combine_columns"],
+            {"columns": ["a", "b"], "separator": "-", "new_name": "a"},
+        )
+
+
+# --- pipeline ----------------------------------------------------------------
+
+def test_pipeline_recompute_and_undo_redo(sample_df):
+    pipe = Pipeline(sample_df)
+    pipe.apply(OP_REGISTRY["trim_collapse"], {"columns": ["Dept"]})
+    pipe.apply(
+        OP_REGISTRY["date_normalize"],
+        {"column": "Hired Date"},
+    )
+    cur = pipe.current()
+    assert "Ops  " not in " ".join(cur["Dept"].to_list())
+    iso = [dt.strftime("%Y-%m-%d") if dt is not None else None for dt in cur["Hired Date"].to_list()]
+    assert iso[0] == "2022-03-22"
+
+    # undo: back to trimmed state (Hired Date still raw strings)
+    assert pipe.undo()
+    df1 = pipe.current()
+    assert df1["Hired Date"].dtype == pl.String
+    assert pipe.undo() and not pipe.undo()  # only two steps existed
+    assert pipe.current().equals(sample_df)
+
+    assert pipe.redo() and pipe.redo()  # re-apply both steps
+    cur = pipe.current()
+    assert cur["Hired Date"].dtype == pl.Datetime("ns")
+    assert len(pipe.step_summary()) == 2
+
+
+def test_pipeline_applies_recompute_from_source(sample_df):
+    pipe = Pipeline(sample_df)
+    pipe.apply(OP_REGISTRY["empty_to_null"], {"columns": ["Hired Date"]})
+    pipe.apply(OP_REGISTRY["date_normalize"], {"column": "Hired Date"})
+    # empty row becomes null (date_normalize), never a stray value
+    assert pipe.current()["Hired Date"].to_list()[2] is None
+
+
+def test_analyze_column_flags_date_candidate():
+    df = pl.DataFrame(
+        {"d": ["2022-03-22", "Mar 1, 2019", "Sept 5 2021", "not a date at all!?!"]}
+    )
+    info = analyze_column(df, "d")
+    assert isinstance(info, ColumnInfo)
+    assert info.dtype == "String" and info.date_candidate
+    assert not analyze_column(pl.DataFrame({"n": [1, 2, 3]}), "n").date_candidate
+
+
+def test_registry_complete():
+    assert set(OP_REGISTRY) == {
+        "date_normalize", "trim_collapse", "empty_to_null", "rename_columns",
+        "dedup_rows", "fill_nulls", "drop_null_rows", "combine_columns",
+        "split_column",
+    }
+    assert all(isinstance(o, Operation) for o in OP_REGISTRY.values())
