@@ -125,19 +125,17 @@ def _apply_combine_columns(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
 def _apply_split_column(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
     col: str = p["column"]
     delim: str = p["delimiter"]
-    max_parts: int = p["max_parts"]
     rest = df.drop(col)
-    if max_parts:
-        # splitn keeps the remainder glued into the last of the n fields
-        name_map = {f"field_{i}": f"{col}_{i + 1}" for i in range(max_parts)}
-        pieces = df.select(
-            pl.col(col)
-            .cast(pl.String)
-            .str.splitn(delim, max_parts)
-            .alias("__split")
-        ).select(pl.col("__split").struct.unnest()).rename(name_map)
-        return rest.hstack(pieces) if rest.width else pieces
-    split = df.select(pl.col(col).cast(pl.String).str.split(delim).alias("__split"))
+    # Always strip edge whitespace first; a space delimiter additionally
+    # collapses internal whitespace runs so one-or-many spaces/tabs split
+    # the same way.
+    cleaned = pl.col(col).cast(pl.String).str.strip_chars()
+    if delim.strip() == "" or set(delim) <= set(" \t\r\n\f\v"):
+        cleaned = cleaned.str.replace_all(r"\s+", " ").replace("", None)
+        delim = " "
+    split = df.select(cleaned.str.split(delim).alias("__split"))
+    # part count comes from the data: the longest actual split for this
+    # delimiter; short rows pad with null
     width = split.select(pl.col("__split").list.len().max()).item() or 1
     names = [f"{col}_{i + 1}" for i in range(width)]
     parts = split.select(
@@ -216,8 +214,13 @@ OPS: tuple[Operation, ...] = (
         title="Split column",
         params=(
             ParamSpec("column", "column", "Column to split"),
-            ParamSpec("delimiter", "text", "Delimiter"),
-            ParamSpec("max_parts", "number", "Max parts (0 = unlimited)", default=0, min_value=0),
+            ParamSpec(
+                "delimiter",
+                "text",
+                "Delimiter",
+                default=" ",
+                help="' ' (default) splits on runs of whitespace; other delimiters split exactly, after trimming edge whitespace. The part count is chosen from the data itself.",
+            ),
         ),
         apply=_apply_split_column,
     ),

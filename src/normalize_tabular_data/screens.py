@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import date_parser
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -12,7 +11,6 @@ from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
     Checkbox,
-    DataTable,
     Input,
     Label,
     ListItem,
@@ -101,10 +99,9 @@ class OpenFileModal(ModalDialog):
         self.dir = directory
         input_widget = self.query_one("#path_input", Input)
         input_widget.placeholder = f"path under {directory}"
-        old_list = self.query("#opendir")
-        new_list = ListView(*self._entries(directory), id="opendir")
-        old_list.remove()
-        self.mount(new_list)
+        listing = self.query_one("#opendir", ListView)
+        listing.clear()
+        listing.extend(self._entries(directory))
 
     def _entries(self, directory: Path) -> list[ListItem]:
         children = sorted(
@@ -146,10 +143,11 @@ class SheetPickerModal(ModalDialog):
         self.sheet_names = sheet_names
 
     def compose_body(self) -> ComposeResult:
+        # Select.BLANK is just `False` in this Textual version; never pass it
+        # as `value` — omit `value` instead (default is the true blank sentinel)
         self.sheet_choice = Select(
             [(name, name) for name in self.sheet_names],
             allow_blank=False,
-            value=self.sheet_names[0] if self.sheet_names else Select.BLANK,
             id="sheet_pick",
         )
         yield self.sheet_choice
@@ -181,13 +179,17 @@ class OpParamsModal(ModalDialog):
                 yield sel
             elif spec.kind == "column":
                 col_names = self._available_columns()
-                preselect = candidates[0] if (candidates and candidates[0] in col_names) else Select.BLANK
+                preselect = (
+                    candidates[0]
+                    if candidates and candidates[0] in col_names
+                    else None
+                )
                 sel = Select(
                     [(name, name) for name in col_names],
                     allow_blank=True,
-                    value=preselect,
                     id="param_column",
                 )
+                self.preselect_column = preselect
                 self.widgets[spec.name] = sel
                 yield sel
             elif spec.kind == "choice":
@@ -218,6 +220,12 @@ class OpParamsModal(ModalDialog):
             if spec.help:
                 yield Label(spec.help, classes="help")
 
+    def on_mount(self) -> None:
+        # Select options are usable only after mount; apply any preselect here
+        preselect = getattr(self, "preselect_column", None)
+        if preselect is not None:
+            self.widgets["column"].value = preselect
+
     def _available_columns(self) -> list[str]:
         return list(getattr(self.app, "current_columns", []) or [])
 
@@ -232,7 +240,7 @@ class OpParamsModal(ModalDialog):
             if spec.kind == "column_multi":
                 params[spec.name] = list(widget.selected)
             elif spec.kind == "column":
-                params[spec.name] = None if widget.value == Select.BLANK else widget.value
+                params[spec.name] = None if widget.value is Select.NULL else widget.value
             elif spec.kind == "number":
                 raw = widget.value.strip()
                 params[spec.name] = int(raw) if raw else None
@@ -257,38 +265,6 @@ class OpParamsModal(ModalDialog):
     @on(Input.Submitted, "#param_text, #param_number")
     def _input_submit_ok(self) -> None:
         self.action_ok()
-
-
-class DateCheckModal(ModalDialog):
-    """Sample a string column and show raw vs parsed datetimes."""
-
-    dialog_title = "Date parse sample"
-
-    def __init__(self, column: str, values: list[str]) -> None:
-        super().__init__()
-        self.column = column
-        self.values = values
-
-    def compose_body(self) -> ComposeResult:
-        table = DataTable(cursor_type="row", id="datecheck")
-        table.add_columns("raw", "parsed UTC datetime")
-        yield table
-
-    def on_mount(self) -> None:
-        table = self.query_one("#datecheck", DataTable)
-        sample = self.values[:20]
-        parsed = date_parser.parse_list(sample)
-        for raw, dt in zip(sample, parsed):
-            shown = (
-                dt.strftime("%Y-%m-%d %H:%M:%S") if dt is not None else "(null)"
-            )
-            table.add_row(raw, shown)
-        nulls = sum(1 for x in parsed if x is None)
-        self.notify(
-            f"{nulls} of {len(sample)} sampled values did not parse",
-            severity="information",
-            title=f"Date check: {self.column}",
-        )
 
 
 class SaveModal(ModalDialog):

@@ -78,21 +78,11 @@ def test_split_column_unlimited():
     op = OP_REGISTRY["split_column"]
     df = op.apply(
         pl.DataFrame({"name": ["Al Doe", "Bo S. Ray", "X"], "n": [1, 2, 3]}),
-        {"column": "name", "delimiter": " ", "max_parts": 0},
+        {"column": "name", "delimiter": " "},
     )
     assert df.columns == ["n", "name_1", "name_2", "name_3"]
     row = df.filter(pl.col("n") == 3).to_dicts()[0]
     assert row["name_1"] == "X" and row["name_2"] is None
-
-
-def test_split_column_bounded():
-    op = OP_REGISTRY["split_column"]
-    df = op.apply(
-        pl.DataFrame({"name": ["Al Doe Bo", "Bo S. Ray"]}),
-        {"column": "name", "delimiter": " ", "max_parts": 2},
-    )
-    assert df.columns == ["name_1", "name_2"]
-    assert df.to_dicts()[0]["name_2"] == "Doe Bo"
 
 
 def test_unknown_column_raises_validation():
@@ -166,3 +156,44 @@ def test_registry_complete():
         "split_column",
     }
     assert all(isinstance(o, Operation) for o in OP_REGISTRY.values())
+
+
+def test_split_column_whitespace_mode_default():
+    """' ' (and blank-forced whitespace) splits on any run of whitespace,
+    after stripping edges."""
+    op = OP_REGISTRY["split_column"]
+    df = op.apply(
+        pl.DataFrame({"name": ["  Al    Doe ", "\tBo \n S. Ray\t", "", None]}),
+        {"column": "name", "delimiter": " "},
+    )
+    assert df["name_1"].dtype == pl.String
+    assert df["name_1"].to_list() == ["Al", "Bo", None, None]
+    assert df["name_2"].to_list() == ["Doe", "S.", None, None]
+    assert df["name_3"].to_list() == [None, "Ray", None, None]
+
+
+def test_split_column_width_chosen_from_data():
+    """No max-parts entry: the number of {col}_N columns is whatever the
+    longest actual split needs (here 4 tokens beats 2 and 3)."""
+    op = OP_REGISTRY["split_column"]
+    df = op.apply(
+        pl.DataFrame({"v": ["a-b", "a", "a-b-c-d"]}),
+        {"column": "v", "delimiter": "-"},
+    )
+    assert df.columns == ["v_1", "v_2", "v_3", "v_4"]
+    assert df["v_2"].to_list() == ["b", None, "b"]
+    assert df["v_4"].to_list() == [None, None, "d"]
+    # short values pad with null, not empty strings
+    assert df.filter(pl.col("v_2").is_null()).to_dicts()[0] == {
+        "v_1": "a", "v_2": None, "v_3": None, "v_4": None,
+    }
+
+
+def test_split_column_other_delimiter_still_trims_edges():
+    op = OP_REGISTRY["split_column"]
+    df = op.apply(
+        pl.DataFrame({"v": [" a-b - c ", "-d"]}),
+        {"column": "v", "delimiter": "-"},
+    )
+    assert df["v_1"].to_list() == ["a", ""]
+    assert df["v_2"].to_list() == ["b ", "d"]

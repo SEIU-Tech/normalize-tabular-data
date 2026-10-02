@@ -1,0 +1,101 @@
+employee_id,Full Name,Worksite,Job Class,Dues Status,Signed Up,Shift Code
+2000,Quinn Huang,Logistics Yard,Security Officer,,2020-12-12,2
+2001,Hana Okafor,Grand Plaza Hotel, Tech 34 ,,2025-07-05,
+2002,Joaquin Lowell,Logistics Yard,Security Officer,current,2021-02-22,1
+2003,Kat Singh,Residence Hall,CNA,arrears,2021-11-07,2
+2004,Iggy Fontaine,Residence Hall,Busser,current,2021-03-14,
+2005,Gio Aguilar,Hospital A,  Front Desk Agent,,2024-10-15,1
+2006,Esther Quintero,Grand Plaza Hotel,Loader,arrears,2022-03-24,1
+2007,Hana Singh,Logistics Yard,Loader,current,2023-01-11,1
+2008,Joaquin Patel,Hospital B,RN,,,
+2009,Quinn Fontaine,Hospital A,Loader,,2025-04-30,2
+2010,Dmitri Turner,  Airport Hub ,RN,arrears,2025-03-03,
+2011,Rosa Singh,Hospital B, Tech 34 ,arrears,2020-04-03,2
+2012,Ana Fontaine,  Airport Hub , Tech 34 ,current,2023-10-16,1
+2013,Ben Ellis,Logistics Yard, Tech 34 ,arrears,,3
+2014,Hana Jackson,Residence Hall,RN,arrears,2018-04-18,2
+2015,Omar Quintero,Residence Hall,  Front Desk Agent,current,2018-01-10,3
+2016,Priya Patel,Hospital A,Loader,current,2018-08-25,
+2017,Joaquin Huang,Logistics Yard,RN,current,2023-01-07,2
+2018,Esther Marsh,  Airport Hub ,RN,arrears,2019-04-23,3
+2019,Gio Brooks,Hospital A,CNA,current,,3
+2020,Quinn Brooks,Logistics Yard,Security Officer,current,2018-11-09,3
+2021,Nadya Turner,  Airport Hub ,Loader,current,2021-01-21,
+2022,Lemar Ellis,Logistics Yard,RN,current,,3
+2023,Ben Aguilar,  Airport Hub ,RN,,2025-07-22,
+2024,Tomas Turner,  Airport Hub ,  Front Desk Agent,current,2023-11-27,3
+2025,Gio Brooks,Logistics Yard,RN,current,2018-03-25,1
+2026,Mona Huang,Grand Plaza Hotel,  Front Desk Agent,current,2024-08-08,3
+2027,Priya Turner,Residence Hall,CNA,current,2018-01-14,1
+2028,Ana Singh,  Airport Hub ,  Front Desk Agent,current,2025-04-11,
+2029,Lemar Fontaine,  Airport Hub , Tech 34 ,arrears,,3
+2030,Kat Kim,Logistics Yard,CNA,current,2025-02-02,3
+2031,Joaquin Ellis,Hospital A,CNA,current,2025-04-14,2
+2032,Hana Reyes,Grand Plaza Hotel,RN,,2024-01-11,3
+2033,Joaquin Kim,Grand Plaza Hotel,RN,arrears,2018-02-02,3
+2034,Frankie Lowell,  Airport Hub ,Security Officer,,,
+2035,Lemar Ellis,Residence Hall,Loader,arrears,2019-01-11,3
+2036,Cleo Jackson,Hospital B,  Front Desk Agent,arrears,2025-03-15,2
+2037,Ana Aguilar,Hospital A,Busser,arrears,2024-11-07,3
+2038,Omar Kim,  Airport Hub , Tech 34 ,current,,
+2039,Gio Ibarra,Hospital A,Security Officer,arrears,2025-09-22,
+2040,Ben Quintero,Residence Hall,RN,,2020-06-10,2
+2041,Dmitri Patel,Hospital B, Tech 34 ,,2022-11-30,1
+2042,Nadya Gekko,Grand Plaza Hotel,RN,current,2022-10-18,
+2043,Mona Singh,Hospital B,Security Officer,,2021-01-10,1
+2044,Omar Singh,Grand Plaza Hotel,RN,current,2020-02-01,2
+2045,Sasha Okafor,Grand Plaza Hotel,Loader,current,2020-08-05,2
+2046,Rosa Okafor,Hospital B,CNA,current,2018-06-28,3
+2047,Esther Gekko,Residence Hall,RN,current,,2
+2048,Ana Fontaine,Hospital A,Security Officer,current,2021-03-14,1
+2049,Esther Fontaine,Grand Plaza Hotel,Security Officer,current,2021-04-30,2
+2050,Hana Aguilar,Residence Hall,Security Officer,arrears,,
+2051,Quinn Chen,Hospital B,Loader,,2019-12-31,2
+2052,Priya Brooks,  Airport Hub ,RN,,2022-07-24,2
+2053,Quinn Ellis,Logistics Yard, Tech 34 ,current,2021-03-24,3
+2054,Gio Fontaine,Hospital B, Tech 34 ,,2023-05-05,3
+2055,Joaquin Ellis,  Airport Hub ,Busser,current,,
+2056,Mona Huang,Grand Plaza Hotel,RN,current,2021-06-06,3
+2057,Quinn Quintero,  Airport Hub ,  Front Desk Agent,current,2024-07-09,3
+2058,Rosa Delgado,Residence Hall,Busser,,2024-09-01,1
+2059,Cleo Huang,Residence Hall,RN,current,2023-05-04,
+2060,Mona Singh,Hospital A,CNA,current,2023-04-13,2
+2061,Iggy Ibarra,Residence Hall,RN,current,2023-11-28,2
+2062,Rosa Turner,  Airport Hub , Tech 34 ,current,2018-08-13,2
+2063,Ana Chen,  Airport Hub ,RN,arrears,2019-10-07,3
+2064,Priya Ibarra,Hospital B,Busser,current,2023-05-29,
+2065,Sasha Delgado,Residence Hall,Loader,arrears,2020-03-21,2
+2066,Hana Brooks,  Airport Hub ,Loader,current,2021-08-06,3
+2067,Esther Reyes,Hospital A,  Front Desk Agent,,2018-01-12,1
+2068,Ben Quintero,Logistics Yard,Loader,current,2019-04-02,2
+2069,Ana Marsh,Hospital A,RN,current,,
+2070,Priya Novak,Logistics Yard,Loader,arrears,2018-03-09,2
+2071,Iggy Okafor,  Airport Hub ,RN,current,2024-03-21,1
+2072,Lemar Chen,Hospital A,Busser,arrears,2021-01-06,1
+2073,Sasha Marsh,Residence Hall, Tech 34 ,,,2
+2074,Mona Turner,  Airport Hub ,  Front Desk Agent,,2020-09-27,
+2075,Ben Kim,Residence Hall,RN,arrears,2025-03-25,1
+2076,Tomas Ellis,  Airport Hub ,CNA,,2019-09-17,3
+2077,Quinn Fontaine,Residence Hall, Tech 34 ,,2025-02-15,
+2078,Nadya Brooks,Hospital A, Tech 34 ,current,2018-10-19,1
+2079,Gio Brooks,Residence Hall,  Front Desk Agent,current,2024-01-22,1
+2080,Ana Ellis,  Airport Hub ,RN,current,,2
+2081,Nadya Turner,Residence Hall,CNA,arrears,2021-09-01,
+2082,Hana Kim,  Airport Hub ,RN,current,2025-09-09,
+2083,Lemar Novak,Grand Plaza Hotel,RN,current,2018-10-07,2
+2084,Tomas Marsh,  Airport Hub ,CNA,current,2019-11-12,
+2085,Lemar Aguilar,Logistics Yard,RN,current,2021-04-09,
+2086,Kat Quintero,Hospital A,Loader,current,2025-10-16,3
+2087,Mona Singh,Grand Plaza Hotel,RN,current,2025-02-16,
+2088,Cleo Novak,  Airport Hub ,CNA,,,3
+2089,Omar Ellis,Hospital A,Loader,,,1
+2090,Rosa Patel,Hospital A,RN,current,2023-08-27,1
+2091,Omar Okafor,Logistics Yard,Loader,,2023-11-14,
+2092,Gio Aguilar,Logistics Yard,Busser,current,2021-12-01,3
+2093,Dmitri Reyes,Logistics Yard,RN,current,,2
+2094,Ben Marsh,Residence Hall,Busser,current,2018-09-23,3
+2095,Gio Gekko,Residence Hall,Security Officer,current,2022-03-20,
+2096,Ana Patel,Logistics Yard,CNA,,2021-02-13,3
+2097,Sasha Okafor,  Airport Hub , Tech 34 ,current,2024-08-23,3
+2098,Ana Chen,Hospital A,RN,,2022-09-20,3
+2099,Hana Jackson,Hospital A,Security Officer,,2025-05-09,2

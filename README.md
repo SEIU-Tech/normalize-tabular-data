@@ -24,15 +24,12 @@ Launch with `normalize-tabular-data`. Keys:
 
 | Key | Action |
 |-----|--------|
-| `o` | Open a file |
-| `n` | Choose an operation |
-| `a` | Apply the selected operation |
-| `p` | Edit pending operation parameters |
-| `u` | Undo last applied step |
-| `r` | Redo |
-| `c` | Date-parse sample check (raw ↔ parsed preview) |
-| `s` | Save the normalized table |
-| `q` | Quit |
+| `f` | (F)ile — open a file |
+| `o` | (O)peration — choose an operation (applied immediately after confirming parameters) |
+| `u` | (U)ndo last applied step |
+| `r` | (R)edo |
+| `s` | (S)ave the normalized table |
+| `q` | (Q)uit |
 
 ## Operations
 

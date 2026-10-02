@@ -6,24 +6,22 @@ import datetime as _dt
 from pathlib import Path
 from typing import Any
 
-import polars as pl
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Header, Label, ListItem, ListView
+from textual.widgets import DataTable, Header, Label, ListItem, ListView
 
 from normalize_tabular_data import io
 from normalize_tabular_data.ops import OP_REGISTRY, Operation, Pipeline, analyze_column
 from normalize_tabular_data.screens import (
-    DateCheckModal,
     ModalDialog,
     OpenFileModal,
     OpParamsModal,
     SaveModal,
     SheetPickerModal,
 )
-from normalize_tabular_data.widgets import ColumnSidebar, StepsBar
+from normalize_tabular_data.widgets import ColumnSidebar, MenuFooter, StepsBar
 
 PREVIEW_ROWS = 500
 
@@ -49,39 +47,14 @@ class OpChooserModal(ModalDialog):
             self.post_result(event.item.name)
 
 
-class ColumnPickModal(ModalDialog):
-    """Pick one string column (used for the date-check sample)."""
-
-    dialog_title = "Date check: pick a column"
-
-    def __init__(self, columns: list[str]) -> None:
-        super().__init__()
-        self.columns = columns
-
-    def compose_body(self) -> ComposeResult:
-        items = [ListItem(Label(name), name=name) for name in self.columns]
-        yield ListView(*items, id="collist")
-
-    def on_mount(self) -> None:
-        self.query_one("#collist", ListView).focus()
-
-    @on(ListView.Selected)
-    def on_col_selected(self, event: ListView.Selected) -> None:
-        if event.item.name:
-            self.post_result(event.item.name)
-
-
 class MainScreen(Screen[None]):
     BINDINGS = [
-        ("o", "app.open", "Open"),
-        ("n", "app.choose_op", "Op"),
-        ("a", "app.apply", "Apply"),
-        ("p", "app.edit_params", "Params"),
-        ("u", "app.undo", "Undo"),
-        ("r", "app.redo", "Redo"),
-        ("c", "app.check_dates", "Check"),
-        ("s", "app.save", "Save"),
-        ("q", "app.quit_app", "Quit"),
+        ("f", "app.open", "(F)ile"),
+        ("o", "app.choose_op", "(O)peration"),
+        ("u", "app.undo", "(U)ndo"),
+        ("r", "app.redo", "(R)edo"),
+        ("s", "app.save", "(S)ave"),
+        ("q", "app.quit_app", "(Q)uit"),
         ("tab", "app.focus_next", ""),
         ("shift+tab", "app.focus_previous", ""),
     ]
@@ -92,7 +65,7 @@ class MainScreen(Screen[None]):
             yield ColumnSidebar(id="sidebar")
             yield DataTable(show_cursor=True, id="preview", cursor_type="row")
         yield StepsBar(id="steps")
-        yield Footer()
+        yield MenuFooter()
 
 
 class NormalizeApp(App[None]):
@@ -107,7 +80,6 @@ class NormalizeApp(App[None]):
         super().__init__()
         self.path: Path | None = None
         self.pipeline: Pipeline | None = None
-        self.pending: tuple[Operation, dict[str, Any]] | None = None
         self.analyzed: dict[str, Any] = {}
 
     @property
@@ -143,7 +115,6 @@ class NormalizeApp(App[None]):
             return
         self.path = path
         self.pipeline = Pipeline(source=df)
-        self.pending = None
         self.title = f"normalize-tabular-data — {path.name}"
         self.analyze_columns()
         self.refresh_preview()
@@ -188,10 +159,7 @@ class NormalizeApp(App[None]):
             steps = self.screen.query_one("#steps", StepsBar)
         except Exception:
             return
-        steps.set_steps(
-            self.pipeline.step_summary() if self.pipeline else [],
-            self.pending[0].title if self.pending else None,
-        )
+        steps.set_steps(self.pipeline.step_summary() if self.pipeline else [])
 
     def refresh_all(self) -> None:
         self.analyze_columns()
@@ -220,40 +188,18 @@ class NormalizeApp(App[None]):
 
             def params_result(params: dict[str, Any] | None) -> None:
                 if params:
-                    self.pending = (op, params)
-                    self._refresh_steps()
+                    self._apply_now(op, params)
 
             self.push_screen(OpParamsModal(op), params_result)
 
         self.push_screen(OpChooserModal(), handle_result)
 
-    def action_edit_params(self) -> None:
-        if self.pending is None:
-            self.notify("No pending operation", severity="warning")
-            return
-        op, _old = self.pending
-
-        def params_result(params: dict[str, Any] | None) -> None:
-            if params:
-                self.pending = (op, params)
-                self._refresh_steps()
-
-        self.push_screen(OpParamsModal(op), params_result)
-
-    def action_apply(self) -> None:
-        if self.pipeline is None:
-            self.notify("Open a file first (o)", severity="warning")
-            return
-        if self.pending is None:
-            self.notify("Choose an operation (n)", severity="warning")
-            return
-        op, params = self.pending
+    def _apply_now(self, op: Operation, params: dict[str, Any]) -> None:
         try:
             self.pipeline.apply(op, params)
         except ValueError as exc:
             self.notify(str(exc), severity="error")
             return
-        self.pending = None
         self.refresh_all()
         self.notify(f"Applied: {op.title}", severity="information")
 
@@ -268,25 +214,6 @@ class NormalizeApp(App[None]):
             self.notify("Nothing to redo", severity="warning")
             return
         self.refresh_all()
-
-    def action_check_dates(self) -> None:
-        if self.pipeline is None:
-            self.notify("Open a file first (o)", severity="warning")
-            return
-        df = self.pipeline.current()
-        string_cols = [c for c in df.columns if df.get_column(c).dtype == pl.String]
-
-        def column_result(column: str | None) -> None:
-            if column is None:
-                return
-            values = [
-                v for v in df.get_column(column).cast(pl.String).drop_nulls().to_list()
-                if isinstance(v, str) and v.strip()
-            ][:20]
-            self.analyzed |= {column: analyze_column(df, column)}
-            self.push_screen(DateCheckModal(column, values))
-
-        self.push_screen(ColumnPickModal(string_cols), column_result)
 
     def action_save(self) -> None:
         if self.pipeline is None:
@@ -315,7 +242,7 @@ class NormalizeApp(App[None]):
 
 def _cell(value: Any) -> str:
     if value is None:
-        return ""
+        return "<NULL>"
     if isinstance(value, _dt.datetime | _dt.date):
         return value.isoformat()
     if isinstance(value, float):
