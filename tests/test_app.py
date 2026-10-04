@@ -45,6 +45,29 @@ async def test_provided_csv_sample(csv_path):
     assert df.columns == ["id", "Hired Date", "Dept", "Notes"]
 
 
+async def test_unreadable_files_show_message_not_crash(tmp_path):
+    """Bad files produce an in-TUI error toast; the app keeps running."""
+    bad_ext = tmp_path / "model.wacz"
+    bad_ext.write_text("not a table")
+    bad_xlsx = tmp_path / "fake.xlsx"
+    bad_xlsx.write_bytes(b"this is not an excel file at all")
+    garbage_csv = tmp_path / "garbage.csv"
+    # rows with more fields than the header -> polars ComputeError
+    garbage_csv.write_bytes(b"a,b\n1,2\n1,2,3,4\n")
+
+    app = NormalizeApp()
+    async with app.run_test() as pilot:
+        for path in (bad_ext, bad_xlsx, garbage_csv):
+            app.load_path(path)  # must not raise
+            await pilot.pause()
+            assert app.pipeline is None
+        # the app is still responsive afterwards
+        await pilot.press("o")  # op chooser warns 'open a file first'
+        await pilot.pause()
+        assert app.screen.__class__.__name__ == "MainScreen"
+        await pilot.press("q")
+
+
 def test_dtype_marks():
     """Compact dtype marks: dt/str/int/dec; everything else oth."""
     from normalize_tabular_data.widgets import _dtype_mark
@@ -57,10 +80,36 @@ def test_dtype_marks():
     assert _dtype_mark("Int64") == "int" and _dtype_mark("UInt32") == "int"
     assert _dtype_mark("Float64") == "dec"
     assert _dtype_mark("Decimal(12, 2)") == "dec"
+    assert _dtype_mark("Boolean") == "t/f"
     # special types fall back to "oth"
-    assert _dtype_mark("Boolean") == "oth"
     assert _dtype_mark("List(String)") == "oth"
     assert _dtype_mark("Null") == "oth"
+
+
+async def test_large_file_previews_random_sample(tmp_path):
+    """>250-row files preview 250 random rows, not the first 250; the same
+    sample stays stable across preview refreshes within one load.
+    (Preview cells are rendered strings, so compare converted ids.)"""
+    import polars as pl
+
+    path = tmp_path / "big.csv"
+    pl.DataFrame({"id": range(2000)}).write_csv(path)
+
+    app = NormalizeApp()
+    async with app.run_test() as pilot:
+        app.load_path(path)
+        await pilot.pause()
+        table = app.screen.query_one("#preview")
+        assert table.row_count == 250
+        ids1 = [int(table.get_row_at(r)[0]) for r in range(table.row_count)]
+        assert len(set(ids1)) == 250  # all in range, no duplicates
+        # not just the first 250 rows of the file
+        assert set(ids1) != set(range(250))
+
+        app.refresh_preview()
+        await pilot.pause()
+        ids2 = [int(table.get_row_at(r)[0]) for r in range(table.row_count)]
+        assert ids1 == ids2
 
 
 async def test_sidebar_shows_dtype_marks(csv_path):
@@ -91,7 +140,7 @@ async def test_sidebar_shows_dtype_marks(csv_path):
 
 
 async def test_sidebar_truncates_long_names(csv_path):
-    """Long column names are truncated to the sidebar's inner width (35):
+    """Long column names are truncated to the sidebar's inner width (39):
     no line ever runs wide enough to wrap into extra rows."""
     from normalize_tabular_data.ops import ColumnInfo
     from normalize_tabular_data.widgets import ColumnSidebar
@@ -106,14 +155,14 @@ async def test_sidebar_truncates_long_names(csv_path):
         await pilot.pause()
         text = sidebar.render()
         lines = text.plain.split("\n")
-        # inner width: 35 - 2 (border) - 2 (padding) = 31
-        assert all(len(line) <= 31 for line in lines)
+        # inner width: 39 - 2 (border) - 2 (padding) = 35
+        assert all(len(line) <= 35 for line in lines)
         # the 40-char name is cut at exactly the fitting width, not wrapped
-        assert lines[5].startswith("  str " + "X" * 17)
-        assert "nulls=5" in lines[5] and lines[5].count("X") == 17
+        assert lines[5].startswith("  str " + "X" * 21)
+        assert "nulls=5" in lines[5] and lines[5].count("X") == 21
         # the "nulls=..." info left-aligns as one column on every line
         starts = {line.find("nulls=") for line in lines[1:]}
-        assert starts == {24}
+        assert starts == {28}
         await pilot.press("q")
 
 

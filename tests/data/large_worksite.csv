@@ -27,17 +27,17 @@ employee_id,Full Name,Worksite,Job Class,Dues Status,Signed Up,Shift Code
 2025,Gio Brooks,Logistics Yard,RN,current,2018-03-25,1
 2026,Mona Huang,Grand Plaza Hotel,  Front Desk Agent,current,2024-08-08,3
 2027,Priya Turner,Residence Hall,CNA,current,2018-01-14,1
-2028,Ana Singh,  Airport Hub ,  Front Desk Agent,current,2025-04-11,
+2028,,  Airport Hub ,  Front Desk Agent,current,2025-04-11,
 2029,Lemar Fontaine,  Airport Hub , Tech 34 ,arrears,,3
 2030,Kat Kim,Logistics Yard,CNA,current,2025-02-02,3
 2031,Joaquin Ellis,Hospital A,CNA,current,2025-04-14,2
 2032,Hana Reyes,Grand Plaza Hotel,RN,,2024-01-11,3
-2033,Joaquin Kim,Grand Plaza Hotel,RN,arrears,2018-02-02,3
+2033,,Grand Plaza Hotel,RN,arrears,2018-02-02,3
 2034,Frankie Lowell,  Airport Hub ,Security Officer,,,
 2035,Lemar Ellis,Residence Hall,Loader,arrears,2019-01-11,3
-2036,Cleo Jackson,Hospital B,  Front Desk Agent,arrears,2025-03-15,2
+2036,Cleo Jackson,,  Front Desk Agent,arrears,2025-03-15,2
 2037,Ana Aguilar,Hospital A,Busser,arrears,2024-11-07,3
-2038,Omar Kim,  Airport Hub , Tech 34 ,current,,
+2038,,  Airport Hub , Tech 34 ,current,,
 2039,Gio Ibarra,Hospital A,Security Officer,arrears,2025-09-22,
 2040,Ben Quintero,Residence Hall,RN,,2020-06-10,2
 2041,Dmitri Patel,Hospital B, Tech 34 ,,2022-11-30,1

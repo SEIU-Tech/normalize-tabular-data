@@ -9,11 +9,12 @@ import polars as pl
 READ_SUFFIXES: dict[str, str] = {
     ".csv": "csv",
     ".tsv": "tsv",
-    ".txt": "csv",
+    ".txt": "tsv",
     ".jsonl": "jsonl",
     ".ndjson": "jsonl",
     ".parquet": "parquet",
     ".pq": "parquet",
+    ".parq": "parquet",
     ".xlsx": "xlsx",
     ".xls": "xlsx",
 }
@@ -38,12 +39,25 @@ def detect_format(path: Path) -> str:
     return fmt
 
 
+def _read_tabular(path: Path, separator: str = ",") -> pl.DataFrame:
+    """CSV/TSV read with a retry fallback.
+
+    Inference looks at up to 10,000 rows; dtype-incompatible values can
+    still appear later in a large file and fail parsing. When that happens,
+    re-read with zero-length inference so every column stays String instead
+    of erroring out."""
+    try:
+        return pl.read_csv(path, separator=separator, infer_schema_length=10_000)
+    except pl.exceptions.PolarsError:
+        return pl.read_csv(path, separator=separator, infer_schema_length=0)
+
+
 def read_table(path: Path, fmt: str, sheet: str | None = None) -> pl.DataFrame:
     """Read one table. For xlsx, `sheet` picks a sheet; default is the first."""
     if fmt == "csv":
-        return pl.read_csv(path)
+        return _read_tabular(path)
     if fmt == "tsv":
-        return pl.read_csv(path, separator="\t")
+        return _read_tabular(path, separator="\t")
     if fmt == "jsonl":
         return pl.read_ndjson(path)
     if fmt == "parquet":

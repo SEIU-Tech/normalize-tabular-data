@@ -1,3 +1,4 @@
+import polars as pl
 import pytest
 
 from normalize_tabular_data.io import (
@@ -28,6 +29,50 @@ def test_read_and_roundtrip(request, tmp_path, fixture_name, fmt):
     assert read_table(out, fmt).shape == df.shape
 
 
+def test_txt_reads_as_tsv(tmp_path, sample_df):
+    """A .txt file is parsed as tab-separated: a real TSV loads cleanly."""
+    out = tmp_path / "data.txt"
+    sample_df.write_csv(out, separator="\t")
+    df = read_table(out, detect_format(out))
+    assert df.columns == ["id", "Hired Date", "Dept", "Notes"]
+    assert df.height == 4
+
+
+def test_csv_infers_types_from_10k_rows(tmp_path):
+    """Inference samples 10_000 rows: a column that turns stringy after the
+    first 100 rows (the old default sample) still loads instead of raising."""
+    out = tmp_path / "late_type_change.csv"
+    out.write_text(
+        "id\n"
+        + "\n".join(str(i) for i in range(150))       # numeric head
+        + "\nlate-string\n"                            # past the old sample
+        + "\n".join(str(i) for i in range(151, 300))
+        + "\n"
+    )
+    df = read_table(out, "csv")  # default length would raise ComputeError
+    assert df.height == 300
+    assert df["id"].dtype == pl.String
+
+
+def test_csv_falls_back_to_all_strings_after_inference_window(tmp_path):
+    """A non-numeric value past the 10_000-row inference window makes the
+    typed read fail; the retry loads everything as String rather than
+    erroring out."""
+    out = tmp_path / "past_window.csv"
+    out.write_text(
+        "id,x\n"
+        + "\n".join(f"{i},{i / 2}" for i in range(10_500))  # numeric head
+        + "\nlate-condition,-1\n"                           # past the window
+        + "\n".join(f"{i},{i / 2}" for i in range(10_501, 11_000))
+        + "\n"
+    )
+    df = read_table(out, "csv")
+    assert df.height == 11_000
+    assert df["id"].dtype == pl.String
+    assert df["x"].dtype == pl.String
+    assert df["id"][10_500] == "late-condition"
+
+
 def test_detect_format():
     from pathlib import Path
 
@@ -35,6 +80,9 @@ def test_detect_format():
     assert detect_format(Path("a.tsv")) == "tsv"
     assert detect_format(Path("a.ndjson")) == "jsonl"
     assert detect_format(Path("a.pq")) == "parquet"
+    assert detect_format(Path("a.parq")) == "parquet"
+    # .txt files are assumed tab-separated
+    assert detect_format(Path("a.txt")) == "tsv"
     assert detect_format(Path("a.xls")) == "xlsx"
 
 

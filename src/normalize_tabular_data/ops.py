@@ -6,7 +6,6 @@ without a terminal.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -60,32 +59,6 @@ def _apply_trim_collapse(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
     )
 
 
-def _apply_empty_to_null(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
-    cols: list[str] = p["columns"]
-    return df.with_columns(pl.col(c).cast(pl.String).replace("", None) for c in cols)
-
-
-def _snake(name: str) -> str:
-    s = re.sub(r"[\s\-]+", "_", str(name).strip())
-    s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s)
-    s = re.sub(r"[^0-9a-zA-Z_]", "_", s)
-    s = re.sub(r"_{2,}", "_", s)
-    return s.strip("_").lower() or "col"
-
-
-def _apply_rename_columns(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
-    style: str = p["style"]
-    mapping = {
-        c: {
-            "snake_case": _snake(c),
-            "lowercase": re.sub(r"[^0-9a-z]+", "_", c.lower()).strip("_") or "col",
-            "slugify": re.sub(r"[^0-9a-z]+", "-", c.lower()).strip("-") or "col",
-        }[style]
-        for c in df.columns
-    }
-    return df.rename(mapping)
-
-
 def _apply_dedup_rows(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
     cols: list[str] = p["columns"]
     keep: str = p["keep"]
@@ -95,18 +68,8 @@ def _apply_dedup_rows(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
     )
 
 
-def _apply_fill_nulls(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
-    cols: list[str] = p["columns"]
-    value: str = p["value"]
-    return df.with_columns(pl.col(c).cast(pl.String).fill_null(value) for c in cols)
-
-
-def _apply_drop_null_rows(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
-    n: int = p["n"]
-    null_sum = pl.sum_horizontal(
-        pl.col(c).is_null().cast(pl.UInt32) for c in df.columns
-    )
-    return df.filter(null_sum < n)
+def _apply_drop_columns(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
+    return df.drop(p["columns"])
 
 
 def _apply_combine_columns(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
@@ -159,21 +122,9 @@ OPS: tuple[Operation, ...] = (
     ),
     Operation(
         key="trim_collapse",
-        title="Trim & collapse whitespace",
-        params=(ParamSpec("columns", "column_multi", "Columns", help="Trim edges, collapse internal runs"),),
+        title="Remove extra whitespace",
+        params=(ParamSpec("columns", "column_multi", "Columns", help="Strip edges, collapse internal runs to one space"),),
         apply=_apply_trim_collapse,
-    ),
-    Operation(
-        key="empty_to_null",
-        title="Empty strings -> null",
-        params=(ParamSpec("columns", "column_multi", "Columns"),),
-        apply=_apply_empty_to_null,
-    ),
-    Operation(
-        key="rename_columns",
-        title="Rename columns",
-        params=(ParamSpec("style", "choice", "Style", default="snake_case", choices=("snake_case", "lowercase", "slugify")),),
-        apply=_apply_rename_columns,
     ),
     Operation(
         key="dedup_rows",
@@ -183,21 +134,6 @@ OPS: tuple[Operation, ...] = (
             ParamSpec("keep", "choice", "Keep", default="first", choices=("first", "last")),
         ),
         apply=_apply_dedup_rows,
-    ),
-    Operation(
-        key="fill_nulls",
-        title="Fill nulls",
-        params=(
-            ParamSpec("columns", "column_multi", "Columns"),
-            ParamSpec("value", "text", "Fill value", default=""),
-        ),
-        apply=_apply_fill_nulls,
-    ),
-    Operation(
-        key="drop_null_rows",
-        title="Drop rows with >= N nulls",
-        params=(ParamSpec("n", "number", "Nulls per row threshold", default=1, min_value=1),),
-        apply=_apply_drop_null_rows,
     ),
     Operation(
         key="combine_columns",
@@ -218,15 +154,39 @@ OPS: tuple[Operation, ...] = (
                 "delimiter",
                 "text",
                 "Delimiter",
-                default=" ",
-                help="' ' (default) splits on runs of whitespace; other delimiters split exactly, after trimming edge whitespace. The part count is chosen from the data itself.",
+                default="",
+                help="Default split is on whitespace. If specified split on exact characters given.",
             ),
         ),
         apply=_apply_split_column,
     ),
+    Operation(
+        key="drop_columns",
+        title="Drop columns",
+        params=(
+            ParamSpec(
+                "columns",
+                "column_multi",
+                "Columns to drop",
+                help="Remove the selected columns entirely",
+            ),
+        ),
+        apply=_apply_drop_columns,
+    ),
 )
 
 OP_REGISTRY: dict[str, Operation] = {op.key: op for op in OPS}
+
+# internal op (not in the chooser): renames one column via sample header clicks
+RENAME_OP = Operation(
+    key="rename_single",
+    title="Rename column",
+    params=(
+        ParamSpec("column", "column", "Column"),
+        ParamSpec("new_name", "text", "New name"),
+    ),
+    apply=lambda df, p: df.rename({p["column"]: p["new_name"]}),
+)
 
 
 # --- pipeline ---------------------------------------------------------------
@@ -266,8 +226,8 @@ class Pipeline:
                 if len(set(picked)) < need:
                     return f"{op.title}: pick at least {need} columns"
             elif spec.kind == "text":
-                if op.key == "split_column" and spec.name == "delimiter" and not val:
-                    return f"{op.title}: delimiter required"
+                # split_column's blank delimiter is allowed: it means
+                # "split on runs of whitespace"
                 if op.key == "combine_columns" and spec.name == "new_name" and not val:
                     return f"{op.title}: new name required"
                 if (

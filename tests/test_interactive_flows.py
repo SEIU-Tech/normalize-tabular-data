@@ -133,6 +133,224 @@ async def test_open_via_directory_listing(sample_data_dir, sample_csv_path):
         assert len(table.columns) == 5
 
 
+async def test_op_chooser_hotkeys(sample_csv_path):
+    """Ops are marked "(N)ormalize dates" style; pressing the marked letter
+    picks that operation directly."""
+    from textual.widgets import Label
+
+    app = NormalizeApp()
+    async with app.run_test() as pilot:
+        app.load_path(sample_csv_path)
+        await pilot.pause()
+        await pilot.press("o")
+        await pilot.pause()
+        listing = app.screen.query_one("#oplist")
+        titles = [item.query_one(Label).visual.plain for item in listing.children]
+        assert titles[0] == "(N)ormalize dates"
+        assert titles[2] == "(D)eduplicate rows"
+        # press 'n' — jumps straight into the date op's parameters
+        await pilot.press("n")
+        await pilot.pause()
+        assert app.screen.__class__.__name__ == "OpParamsModal"
+        assert app.screen.dialog_title == "Normalize dates"
+        await pilot.press("escape")
+        await pilot.pause()
+        # 'd' — deduplicate
+        await pilot.press("o")
+        await pilot.pause()
+        await pilot.press("d")
+        await pilot.pause()
+        assert app.screen.dialog_title == "Deduplicate rows"
+
+
+async def test_open_dialog_moves_up_a_directory(sample_data_dir, sample_csv_path):
+    """The listing starts with "../" so the user can climb above the start dir,
+    then come back down and still pick a file."""
+    from textual.widgets import ListView
+
+    app = NormalizeApp()
+    async with app.run_test() as pilot:
+        await pilot.press("f")
+        await pilot.pause()
+        modal = app.screen
+        assert modal.__class__.__name__ == "OpenFileModal"
+        modal._refresh_dir(sample_data_dir)
+        await pilot.pause()
+        listing = modal.query_one("#opendir", ListView)
+        listing.focus()
+        await pilot.pause()
+
+        # first entry is always the parent directory
+        assert listing.children[0].name == str(sample_data_dir.parent.resolve())
+
+        # select it -> the dialog now lists the parent's contents
+        listing.index = 0
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert modal.dir == sample_data_dir.parent.resolve()
+        names = {item.name for item in listing.children}
+        assert str(sample_data_dir) in names
+
+        # navigate back into tests/data and open the csv from there
+        down = [item.name for item in listing.children].index(str(sample_data_dir))
+        listing.index = down
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        csv_index = [item.name for item in listing.children].index(
+            str(sample_csv_path)
+        )
+        listing.index = csv_index
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert app.pipeline is not None
+
+
+async def test_combine_columns_dialog_mounts_and_applies(sample_csv_path):
+    """Regression: the combine dialog has two text params (separator,
+    new_name) — distinct widget ids; it mounts and applies cleanly."""
+    app = NormalizeApp()
+    async with app.run_test() as pilot:
+        app.load_path(sample_csv_path)
+        await pilot.pause()
+        await pilot.press("o")
+        await pilot.pause()
+        listing = app.screen.query_one("#oplist")
+        listing.index = [i.name for i in listing.children].index("combine_columns")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert app.screen.__class__.__name__ == "OpParamsModal"
+        # separator field starts blank with the "Separator" shadow text
+        assert app.screen.widgets["separator"].value == ""
+        assert app.screen.widgets["separator"].placeholder == "Separator"
+
+        app.screen.widgets["columns"].select("Name")
+        app.screen.widgets["columns"].select("Zip")
+        app.screen.widgets["separator"].value = "-"
+        app.screen.widgets["new_name"].value = "name_zip"
+        app.screen.action_ok()
+        await pilot.pause()
+
+        current = app.pipeline.current()
+        assert current["name_zip"].to_list()[0] == "  Alice  Doe-10001"
+        assert current.columns[-1] == "name_zip"
+
+
+async def test_rename_column_via_header_click(sample_csv_path):
+    """Clicking a header opens the rename dialog; a new name renames the
+    column as a pipeline step (undoable)."""
+    from textual.widgets import DataTable
+
+    app = NormalizeApp()
+    async with app.run_test() as pilot:
+        app.load_path(sample_csv_path)
+        await pilot.pause()
+        table = app.screen.query_one("#preview", DataTable)
+        dept = list(table.columns.values())[2]  # "Dept"
+
+        def click_header() -> None:
+            app.post_message(DataTable.HeaderSelected(table, dept.key, 2, dept.label))
+
+        # simulate clicking the "Dept" header
+        click_header()
+        await pilot.pause()
+        assert app.screen.__class__.__name__ == "RenameColumnModal"
+        modal = app.screen
+        assert modal.name_input.value == "Dept"
+
+        modal.name_input.value = "dept_code"
+        modal.action_ok()
+        await pilot.pause()
+        cols = app.pipeline.current().columns
+        assert cols == ["member_id", "Hired Date", "dept_code", "Name", "Zip"]
+        assert "new_name=dept_code" in " ".join(app.pipeline.step_summary())
+
+        # duplicate names are rejected with a notify, not applied
+        dept = list(table.columns.values())[2]  # now "dept_code"
+        app.post_message(DataTable.HeaderSelected(table, dept.key, 2, dept.label))
+        await pilot.pause()
+        modal = app.screen
+        modal.name_input.value = "Name"
+        modal.action_ok()
+        await pilot.pause()
+        assert app.screen.__class__.__name__ == "MainScreen"
+        assert "Name" not in app.pipeline.step_summary()[0]
+
+        # undo restores the original name before the rename
+        app.action_undo()
+        assert app.pipeline.current().columns == [
+            "member_id", "Hired Date", "Dept", "Name", "Zip",
+        ]
+
+
+async def test_op_chooser_leaves_data_visible(large_csv_path):
+    """The op chooser docks over the sidebar area only: the preview table is
+    not covered, so data rows stay visible in the main pane."""
+    from textual.containers import Vertical
+    from textual.widgets import DataTable
+
+    app = NormalizeApp()
+    async with app.run_test(size=(90, 24)) as pilot:
+        app.load_path(large_csv_path)
+        await pilot.pause()
+        await pilot.press("o")
+        await pilot.pause()
+        assert app.screen.__class__.__name__ == "OpChooserModal"
+        box = app.screen.query_one(Vertical)
+        table = [s for s in app.screen_stack if type(s).__name__ == "MainScreen"][
+            0
+        ].query_one("#preview", DataTable)
+        box_region = box.region
+        table_region = table.region
+        # the dialog box ends before the table begins
+        assert box_region.x + box_region.width <= table_region.x
+        # 100-row sample shows its preview rows without any overlap
+        _, preview_rows = table_region.size
+        assert preview_rows >= 5
+        # OK/Cancel buttons render fully inside the narrow dialog box
+        from textual.widgets import Button
+
+        for btn in app.screen.query(Button):
+            r = btn.region
+            assert r.x >= box_region.x
+            assert r.x + r.width <= box_region.x + box_region.width - 2
+
+
+async def test_op_params_modal_docks_in_sidebar(large_csv_path):
+    """The parameter dialog docks over the sidebar too, and OK/Cancel fit."""
+    from textual.containers import Vertical
+    from textual.widgets import Button, DataTable
+
+    app = NormalizeApp()
+    async with app.run_test(size=(90, 24)) as pilot:
+        app.load_path(large_csv_path)
+        await pilot.pause()
+        await pilot.press("o")
+        await pilot.pause()
+        listing = app.screen.query_one("#oplist")
+        listing.index = [i.name for i in listing.children].index("split_column")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert app.screen.__class__.__name__ == "OpParamsModal"
+        box = app.screen.query_one(Vertical)
+        box_region = box.region
+        table = [
+            s for s in app.screen_stack if type(s).__name__ == "MainScreen"
+        ][0].query_one("#preview", DataTable)
+
+        # dialog box lives inside the sidebar strip; nothing covers the table
+        assert box_region.x + box_region.width <= table.region.x
+        # every button lies fully inside the dialog box (minus padding)
+        for btn in app.screen.query(Button):
+            r = btn.region
+            assert r.x >= box_region.x
+            assert r.x + r.width <= box_region.x + box_region.width - 2
+
+
 async def test_open_100_row_file_via_dialog(large_csv_path):
     """Second committed sample: 100 rows, different columns than employees.csv."""
     from textual.widgets import DataTable
@@ -219,3 +437,40 @@ async def test_split_column_op_applies(large_csv_path):
         ]
         assert cols[6:] == [f"Full Name_{i}" for i in range(1, tokens + 1)]
         assert "Full Name" not in cols
+
+
+async def test_left_right_scroll_by_whole_column(large_csv_path):
+    """Left/Right snap the preview to column start boundaries: one column
+    per press, not one character."""
+    from normalize_tabular_data.app import PreviewTable
+
+    app = NormalizeApp()
+    # narrow pane so the table overflows horizontally (sidebar takes 39 cols)
+    async with app.run_test(size=(70, 20)) as pilot:
+        app.load_path(large_csv_path)
+        await pilot.pause()
+        table = app.screen.query_one("#preview", PreviewTable)
+        table.focus()
+        await pilot.pause()
+
+        offsets = table._column_offsets()
+        assert table.max_scroll_x > offsets[2]  # enough room to scroll
+
+        await pilot.press("right")
+        await pilot.pause()
+        assert table.scroll_x == offsets[1]
+        await pilot.press("right")
+        await pilot.press("right")
+        await pilot.pause()
+        assert table.scroll_x == offsets[3]
+
+        await pilot.press("left")
+        await pilot.pause()
+        assert table.scroll_x == offsets[2]
+        # left past the start clamps at zero
+        await pilot.press("left")
+        await pilot.press("left")
+        await pilot.press("left")
+        await pilot.press("left")
+        await pilot.pause()
+        assert table.scroll_x == 0.0

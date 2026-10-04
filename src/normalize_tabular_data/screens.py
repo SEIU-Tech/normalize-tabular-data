@@ -37,8 +37,8 @@ class ModalDialog(ModalScreen):
         max-width: 96;
         max-height: 90%;
     }
-    .buttons { align-horizontal: right; margin-top: 1; }
-    Button { margin-left: 2; }
+    .buttons { align-horizontal: right; margin-top: 1; height: auto; }
+    Button { margin-left: 1; width: auto; min-width: 6 !important; }
     Label.help { color: $text-muted; }
     #path_input, #save_input { width: 64; }
     ListView { height: 12; width: 64; }
@@ -108,12 +108,11 @@ class OpenFileModal(ModalDialog):
             (p for p in directory.iterdir() if not p.name.startswith(".")),
             key=lambda p: (not p.is_dir(), p.name.lower()),
         )
-        items = [
+        items = [ListItem(Label("../"), name=str(directory.parent.resolve()))]
+        items += [
             ListItem(Label(p.name + ("/" if p.is_dir() else "")), name=str(p))
             for p in children
         ]
-        if not items:
-            items = [ListItem(Label("(empty directory)"))]
         return items
 
     @on(ListView.Selected)
@@ -131,6 +130,51 @@ class OpenFileModal(ModalDialog):
         raw = self.query_one("#path_input", Input).value.strip()
         if raw:
             self.post_result(Path(raw).expanduser())
+
+
+class RenameColumnModal(ModalDialog):
+    """Enter a new name for one column; dismisses with the name or None.
+
+    Docks in the sidebar and hugs its content: title + input + buttons."""
+
+    dialog_title = "Rename column"
+
+    DEFAULT_CSS = """
+    RenameColumnModal {
+        align: left middle;
+    }
+    RenameColumnModal > Vertical {
+        width: 38;
+    }
+    RenameColumnModal Input {
+        width: 32;
+    }
+    RenameColumnModal > Vertical > Horizontal.buttons {
+        height: auto;
+    }
+    """
+
+    def __init__(self, current: str) -> None:
+        super().__init__()
+        self.current = current
+
+    def compose_body(self) -> ComposeResult:
+        self.name_input = Input(value=self.current, id="rename_input")
+        yield self.name_input
+
+    def on_mount(self) -> None:
+        self.name_input.focus()
+
+    def action_ok(self) -> None:
+        raw = self.name_input.value.strip()
+        if not raw:
+            self.app.notify("Column name cannot be empty", severity="error")
+            return
+        self.post_result(raw)
+
+    @on(Input.Submitted, "#rename_input")
+    def _rename_input_submit(self) -> None:
+        self.action_ok()
 
 
 class SheetPickerModal(ModalDialog):
@@ -157,9 +201,35 @@ class SheetPickerModal(ModalDialog):
 
 
 class OpParamsModal(ModalDialog):
-    """Collect parameters for an Operation; dismisses with the params dict."""
+    """Collect parameters for an Operation; dismisses with the params dict.
+
+    Docks over the sidebar (like the op chooser), so the preview table in the
+    main pane keeps showing data rows while parameters are entered."""
 
     dialog_title = "Parameters"
+
+    DEFAULT_CSS = """
+    OpParamsModal {
+        align: left middle;
+    }
+    OpParamsModal > Vertical {
+        width: 38;
+    }
+    OpParamsModal SelectionList,
+    OpParamsModal Select,
+    OpParamsModal Input {
+        width: 32;
+    }
+    /* a long column list must not push the OK/Cancel buttons and later
+    * fields out of the dialog: cap it and let it scroll internally */
+    OpParamsModal SelectionList {
+        max-height: 10;
+    }
+    OpParamsModal Label.help {
+        width: 32;
+        text-wrap: wrap;
+    }
+    """
 
     def __init__(self, op: Operation) -> None:
         super().__init__()
@@ -202,7 +272,12 @@ class OpParamsModal(ModalDialog):
                 self.widgets[spec.name] = sel
                 yield sel
             elif spec.kind == "number":
-                inp = Input(str(spec.default or ""), type="integer", id="param_number")
+                inp = Input(
+                    str(spec.default or ""),
+                    type="integer",
+                    id=f"param_number_{spec.name}",
+                    classes="param_input",
+                )
                 self.widgets[spec.name] = inp
                 yield inp
             elif spec.kind == "bool":
@@ -210,10 +285,16 @@ class OpParamsModal(ModalDialog):
                 self.widgets[spec.name] = chk
                 yield chk
             else:
+                default = spec.default if isinstance(spec.default, str) else ""
+                # a whitespace-only default (the separator's single space)
+                # looks empty anyway; start blank so the placeholder acts
+                # as visible shadow text
+                value = "" if not default.strip() else default
                 inp = Input(
-                    value=spec.default if isinstance(spec.default, str) else "",
+                    value=value,
                     placeholder=spec.title,
-                    id="param_text",
+                    id=f"param_text_{spec.name}",
+                    classes="param_input",
                 )
                 self.widgets[spec.name] = inp
                 yield inp
@@ -262,7 +343,7 @@ class OpParamsModal(ModalDialog):
             return
         self.post_result(params)
 
-    @on(Input.Submitted, "#param_text, #param_number")
+    @on(Input.Submitted, ".param_input")
     def _input_submit_ok(self) -> None:
         self.action_ok()
 

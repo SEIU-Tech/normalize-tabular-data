@@ -30,39 +30,11 @@ def test_trim_collapse():
     assert df["n"].to_list() == [1, 2]
 
 
-def test_empty_to_null():
-    op = OP_REGISTRY["empty_to_null"]
-    df = op.apply(pl.DataFrame({"a": ["", "x", None, " "]}), {"columns": ["a"]})
-    # only genuinely empty string becomes null (a trailing-space value does not)
-    assert df["a"].to_list() == [None, "x", None, " "]
-
-
-def test_rename_columns_styles():
-    df = pl.DataFrame({"Some Name": [1], "DOB4": [2]})
-    snake = OP_REGISTRY["rename_columns"].apply(df, {"style": "snake_case"})
-    assert snake.columns == ["some_name", "dob4"]
-    slug = OP_REGISTRY["rename_columns"].apply(df, {"style": "slugify"})
-    assert slug.columns == ["some-name", "dob4"]
-
-
 def test_dedup_rows_all_and_subset():
     op = OP_REGISTRY["dedup_rows"]
     df = pl.DataFrame({"a": [1, 1, 2], "b": [1, 2, 2]})
     assert op.apply(df, {"columns": ["a"], "keep": "first"}).height == 2
     assert op.apply(df, {"columns": [], "keep": "first"}).height == 3
-
-
-def test_fill_nulls_casts_to_string():
-    op = OP_REGISTRY["fill_nulls"]
-    df = op.apply(pl.DataFrame({"a": [None, "2"]}), {"columns": ["a"], "value": "0"})
-    assert df["a"].to_list() == ["0", "2"]
-
-
-def test_drop_null_rows():
-    op = OP_REGISTRY["drop_null_rows"]
-    df = pl.DataFrame({"a": [None, "x", "y"], "b": [None, None, "1"]})
-    assert op.apply(df, {"n": 1}).height == 1  # only row 3 has no nulls
-    assert op.apply(df, {"n": 2}).height == 2
 
 
 def test_combine_columns():
@@ -133,10 +105,12 @@ def test_pipeline_recompute_and_undo_redo(sample_df):
 
 def test_pipeline_applies_recompute_from_source(sample_df):
     pipe = Pipeline(sample_df)
-    pipe.apply(OP_REGISTRY["empty_to_null"], {"columns": ["Hired Date"]})
+    pipe.apply(OP_REGISTRY["trim_collapse"], {"columns": ["Notes"]})
     pipe.apply(OP_REGISTRY["date_normalize"], {"column": "Hired Date"})
-    # empty row becomes null (date_normalize), never a stray value
-    assert pipe.current()["Hired Date"].to_list()[2] is None
+    # recompute folds all steps from the original source
+    cur = pipe.current()
+    assert cur["Notes"].to_list() == ["", "", "Alice Doe", ""]
+    assert cur["Hired Date"].dtype == pl.Datetime("ns")
 
 
 def test_analyze_column_flags_date_candidate():
@@ -151,10 +125,19 @@ def test_analyze_column_flags_date_candidate():
 
 def test_registry_complete():
     assert set(OP_REGISTRY) == {
-        "date_normalize", "trim_collapse", "empty_to_null", "rename_columns",
-        "dedup_rows", "fill_nulls", "drop_null_rows", "combine_columns",
-        "split_column",
+        "date_normalize", "trim_collapse",
+        "dedup_rows", "combine_columns",
+        "split_column", "drop_columns",
     }
+    assert all(isinstance(o, Operation) for o in OP_REGISTRY.values())
+    # the header-click rename is internal: it exists but is not offered
+    from normalize_tabular_data.ops import RENAME_OP
+
+    assert RENAME_OP.key not in OP_REGISTRY
+    renamed = RENAME_OP.apply(
+        pl.DataFrame({"a": [1], "b": [2]}), {"column": "a", "new_name": "z"}
+    )
+    assert renamed.columns == ["z", "b"]
     assert all(isinstance(o, Operation) for o in OP_REGISTRY.values())
 
 
@@ -189,6 +172,13 @@ def test_split_column_width_chosen_from_data():
     }
 
 
+def test_pipeline_split_blank_delimiter_means_whitespace():
+    """Blank delimiter passes validation and splits on whitespace runs."""
+    pipe = Pipeline(pl.DataFrame({"name": ["A   B"]}))
+    pipe.apply(OP_REGISTRY["split_column"], {"column": "name", "delimiter": ""})
+    assert pipe.current().columns == ["name_1", "name_2"]
+
+
 def test_split_column_other_delimiter_still_trims_edges():
     op = OP_REGISTRY["split_column"]
     df = op.apply(
@@ -197,3 +187,18 @@ def test_split_column_other_delimiter_still_trims_edges():
     )
     assert df["v_1"].to_list() == ["a", ""]
     assert df["v_2"].to_list() == ["b ", "d"]
+
+
+def test_drop_columns():
+    op = OP_REGISTRY["drop_columns"]
+    df = op.apply(
+        pl.DataFrame({"a": [1], "b": [2], "c": [3]}),
+        {"columns": ["a", "c"]},
+    )
+    assert df.columns == ["b"]
+
+
+def test_drop_columns_requires_selection():
+    pipe = Pipeline(pl.DataFrame({"a": [1], "b": [2]}))
+    with pytest.raises(ValueError, match="pick at least one"):
+        pipe.apply(OP_REGISTRY["drop_columns"], {"columns": []})

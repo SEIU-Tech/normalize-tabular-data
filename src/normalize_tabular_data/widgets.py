@@ -24,7 +24,7 @@ class ColumnSidebar(Widget):
 
     DEFAULT_CSS = """
     ColumnSidebar {
-        width: 35;
+        width: 39;
         height: 1fr;
         border: round $accent;
         padding: 1 1;
@@ -65,13 +65,15 @@ class ColumnSidebar(Widget):
 
 def _dtype_mark(dtype: str) -> str:
     """Compact 3-wide dtype mark for the sidebar: dt (datetime/date),
-    str (string), int (integer), dec (float/decimal); everything else oth.
-    Each mark is padded to 3 columns so column names left-align."""
+    str (string), int (integer), dec (float/decimal), t/f (boolean);
+    everything else oth. Each mark is padded to 3 columns so column
+    names left-align."""
     for prefix, mark in (
         ("Datetime", "dt "), ("Date", "dt "), ("Time", "dt "),
         ("String", "str"), ("Categorical", "str"), ("Enum", "str"),
         ("Int", "int"), ("UInt", "int"),
         ("Float", "dec"), ("Decimal", "dec"),
+        ("Boolean", "t/f"),
     ):
         if dtype.startswith(prefix):
             return mark
