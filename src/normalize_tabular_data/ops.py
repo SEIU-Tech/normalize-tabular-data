@@ -35,6 +35,9 @@ class Operation:
     title: str
     params: tuple[ParamSpec, ...]
     apply: Callable[[pl.DataFrame, dict[str, Any]], pl.DataFrame]
+    # designated chooser hotkey letter; "" lets the chooser pick the first
+    # unused letter in the title
+    hotkey: str = ""
 
 
 # --- apply functions -------------------------------------------------------
@@ -117,18 +120,21 @@ OPS: tuple[Operation, ...] = (
     Operation(
         key="date_normalize",
         title="Normalize dates",
+        hotkey="d",
         params=(ParamSpec("column", "column", "Date column", help="Any input format; unparseable -> null"),),
         apply=_apply_date_normalize,
     ),
     Operation(
         key="trim_collapse",
-        title="Remove extra whitespace",
+        title="Trim whitespace",
+        hotkey="w",
         params=(ParamSpec("columns", "column_multi", "Columns", help="Strip edges, collapse internal runs to one space"),),
         apply=_apply_trim_collapse,
     ),
     Operation(
         key="dedup_rows",
         title="Deduplicate rows",
+        hotkey="p",
         params=(
             ParamSpec("columns", "column_multi", "Key columns (empty = all)"),
             ParamSpec("keep", "choice", "Keep", default="first", choices=("first", "last")),
@@ -138,6 +144,7 @@ OPS: tuple[Operation, ...] = (
     Operation(
         key="combine_columns",
         title="Combine columns",
+        hotkey="c",
         params=(
             ParamSpec("columns", "column_multi", "Columns (>= 2)"),
             ParamSpec("separator", "text", "Separator", default=" "),
@@ -148,6 +155,7 @@ OPS: tuple[Operation, ...] = (
     Operation(
         key="split_column",
         title="Split column",
+        hotkey="s",
         params=(
             ParamSpec("column", "column", "Column to split"),
             ParamSpec(
@@ -161,13 +169,14 @@ OPS: tuple[Operation, ...] = (
         apply=_apply_split_column,
     ),
     Operation(
-        key="drop_columns",
-        title="Drop columns",
+        key="remove_columns",
+        title="Remove columns",
+        hotkey="r",
         params=(
             ParamSpec(
                 "columns",
                 "column_multi",
-                "Columns to drop",
+                "Columns to remove",
                 help="Remove the selected columns entirely",
             ),
         ),

@@ -8,6 +8,9 @@ from collections import defaultdict
 from itertools import groupby
 
 from rich.text import Text
+from textual.app import ComposeResult
+from textual.containers import VerticalScroll
+from textual.css.query import NoMatches
 from textual.widget import Widget
 from textual.widgets import Footer, Static
 from textual.widgets._footer import FooterKey, FooterLabel, KeyGroup
@@ -20,7 +23,10 @@ class ColumnSidebar(Widget):
 
     Column selection for operations happens inside the operation parameter
     dialogs (SelectionList); the sidebar is informational.
-    """
+
+    The list lives in a VerticalScroll child because a plain Widget never
+    registers as scrollable: a list longer than the panel scrolls instead
+    of clipping."""
 
     DEFAULT_CSS = """
     ColumnSidebar {
@@ -28,22 +34,44 @@ class ColumnSidebar(Widget):
         height: 1fr;
         border: round $accent;
         padding: 1 1;
+        layout: vertical;
+    }
+    ColumnSidebar > VerticalScroll {
+        height: 1fr;
+        width: 1fr;
+    }
+    ColumnSidebar > VerticalScroll > Static {
+        width: 100%;
     }
     """
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.infos: list[ColumnInfo] = []
+        self.content_text = Text("Columns (0)")
+
+    def compose(self) -> ComposeResult:
+        with VerticalScroll():
+            yield Static(self.content_text, id="sidebar_text")
 
     def set_infos(self, infos: list[ColumnInfo]) -> None:
         self.infos = infos
-        self.refresh()
+        self.content_text = self._build_text()
+        try:
+            self.query_one("#sidebar_text", Static).update(self.content_text)
+        except NoMatches:
+            pass  # not unmounted yet: compose will show content_text
 
-    def render(self) -> Text:
+    def _build_text(self) -> Text:
         text = Text(f"Columns ({len(self.infos)})")
         # usable width (self.size already excludes border and padding); keep
         # every line within it so long column names truncate instead of wrapping
         avail = max(self.size.width, 9)
+        # when the list outgrows the panel the scrollbar claims two columns
+        # of the inner area: build the lines for the reduced width so they
+        # never wrap inside the scrolling region
+        if len(self.infos) + 1 > self.size.height:
+            avail = max(avail - 2, 9)
         # the null counts left-align as one column, as wide as the widest count
         null_w = max(
             (len(f"nulls={info.null_count}") for info in self.infos),

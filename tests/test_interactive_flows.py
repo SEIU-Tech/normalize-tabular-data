@@ -134,8 +134,9 @@ async def test_open_via_directory_listing(sample_data_dir, sample_csv_path):
 
 
 async def test_op_chooser_hotkeys(sample_csv_path):
-    """Ops are marked "(N)ormalize dates" style; pressing the marked letter
-    picks that operation directly."""
+    """Ops show their designated hotkey letter highlighted in place,
+    e.g. "Normalize (d)ates"; pressing the marked letter picks that
+    operation directly."""
     from textual.widgets import Label
 
     app = NormalizeApp()
@@ -146,21 +147,34 @@ async def test_op_chooser_hotkeys(sample_csv_path):
         await pilot.pause()
         listing = app.screen.query_one("#oplist")
         titles = [item.query_one(Label).visual.plain for item in listing.children]
-        assert titles[0] == "(N)ormalize dates"
-        assert titles[2] == "(D)eduplicate rows"
-        # press 'n' — jumps straight into the date op's parameters
-        await pilot.press("n")
+        assert titles == [
+            "Normalize (d)ates",
+            "Trim (w)hitespace",
+            "Dedu(p)licate rows",
+            "(C)ombine columns",
+            "(S)plit column",
+            "(R)emove columns",
+        ]
+        # press 'd' — jumps straight into the date op's parameters
+        await pilot.press("d")
         await pilot.pause()
         assert app.screen.__class__.__name__ == "OpParamsModal"
         assert app.screen.dialog_title == "Normalize dates"
         await pilot.press("escape")
         await pilot.pause()
-        # 'd' — deduplicate
+        # 'p' — deduplicate
         await pilot.press("o")
         await pilot.pause()
-        await pilot.press("d")
+        await pilot.press("p")
         await pilot.pause()
         assert app.screen.dialog_title == "Deduplicate rows"
+        await pilot.press("escape")
+        await pilot.pause()
+        await pilot.press("o")
+        await pilot.pause()
+        await pilot.press("r")
+        await pilot.pause()
+        assert app.screen.dialog_title == "Remove columns"
 
 
 async def test_open_dialog_moves_up_a_directory(sample_data_dir, sample_csv_path):

@@ -98,18 +98,26 @@ class OpChooserModal(ModalDialog):
         # hotkey letter (lowercase) -> op key; letters are unique across ops
         self._hotkeys: dict[str, str] = {}
 
-    def _marked_title(self, op_key: str, title: str) -> str:
-        """Return the "(N)ormalize dates" label markup for a title, claiming
-        its first unused letter as the hotkey; plain title if none is free."""
-        for i, char in enumerate(title):
-            if char.isalnum() and char.lower() not in self._hotkeys:
-                self._hotkeys[char.lower()] = op_key
-                return f"{title[:i]}([cyan]{char.upper()}[/cyan]){title[i + 1:]}"
-        return title
+    def _marked_title(self, op_key: str, title: str, hotkey: str = "") -> str:
+        """Return "Normalize (d)ates"-style markup: the op's hotkey letter
+        highlighted where it sits in the title (keeping its case). Ops
+        without a designated hotkey claim the first unused letter in the
+        title instead; plain title if no letter can be claimed."""
+        if hotkey:
+            i = title.lower().find(hotkey.lower())
+        else:
+            i = next(
+                (i for i, c in enumerate(title) if c.isalnum() and c.lower() not in self._hotkeys),
+                -1,
+            )
+        if i < 0:
+            return title
+        self._hotkeys[title[i].lower()] = op_key
+        return f"{title[:i]}([cyan]{title[i]}[/cyan]){title[i + 1:]}"
 
     def compose_body(self) -> ComposeResult:
         items = [
-            ListItem(Label(self._marked_title(op.key, op.title)), name=op.key)
+            ListItem(Label(self._marked_title(op.key, op.title, op.hotkey)), name=op.key)
             for op in OP_REGISTRY.values()
         ]
         yield ListView(*items, id="oplist")

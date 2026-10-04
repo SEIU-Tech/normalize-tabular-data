@@ -127,7 +127,7 @@ def test_registry_complete():
     assert set(OP_REGISTRY) == {
         "date_normalize", "trim_collapse",
         "dedup_rows", "combine_columns",
-        "split_column", "drop_columns",
+        "split_column", "remove_columns",
     }
     assert all(isinstance(o, Operation) for o in OP_REGISTRY.values())
     # the header-click rename is internal: it exists but is not offered
@@ -189,8 +189,8 @@ def test_split_column_other_delimiter_still_trims_edges():
     assert df["v_2"].to_list() == ["b ", "d"]
 
 
-def test_drop_columns():
-    op = OP_REGISTRY["drop_columns"]
+def test_remove_columns():
+    op = OP_REGISTRY["remove_columns"]
     df = op.apply(
         pl.DataFrame({"a": [1], "b": [2], "c": [3]}),
         {"columns": ["a", "c"]},
@@ -198,7 +198,7 @@ def test_drop_columns():
     assert df.columns == ["b"]
 
 
-def test_drop_columns_requires_selection():
+def test_remove_columns_requires_selection():
     pipe = Pipeline(pl.DataFrame({"a": [1], "b": [2]}))
     with pytest.raises(ValueError, match="pick at least one"):
-        pipe.apply(OP_REGISTRY["drop_columns"], {"columns": []})
+        pipe.apply(OP_REGISTRY["remove_columns"], {"columns": []})

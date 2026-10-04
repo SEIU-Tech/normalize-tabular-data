@@ -6,8 +6,8 @@ A terminal UI (Textual) for interactively normalizing tabular data, backed by
 date parsing at Rust speed.
 
 Load a file, see a preview, build up a pipeline of normalization operations
-(normalize messy dates, remove extra whitespace, rename a column,
-deduplicate, combine/split columns), then save the
+(normalize messy dates, trim whitespace, rename a column, deduplicate,
+combine/split columns, drop columns), then save the
 cleaned result.
 
 ## Install
@@ -35,13 +35,14 @@ Launch with `normalize-tabular-data`. Keys:
 
 - **Normalize dates** — parse a messy date column of *any* input format into
   canonical UTC datetimes; unparseable values become null.
-- **Remove extra whitespace** — per selected columns.
+- **Trim whitespace** — strip edges and collapse internal whitespace runs,
+  per selected columns.
 - Rename a column — click its header in the preview and type the new name.
 - **Deduplicate rows** — on all or selected columns, keeping first or last.
 - **Combine columns** — concatenate two or more columns with a separator.
 - **Split column** — break one column into `{col}_1..{col}_k`; a blank
   delimiter splits on runs of whitespace.
-- **Drop columns** — remove selected columns entirely.
+- **Remove columns** — drop selected columns entirely.
 
 ## Formats
 

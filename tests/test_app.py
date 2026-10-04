@@ -86,6 +86,40 @@ def test_dtype_marks():
     assert _dtype_mark("Null") == "oth"
 
 
+async def test_sidebar_scrollable_when_column_list_long(tmp_path):
+    """A column list taller than the sidebar panel scrolls instead of
+    clipping; a short list leaves no scrollbar."""
+    from textual.containers import VerticalScroll
+
+    from normalize_tabular_data.widgets import ColumnSidebar
+
+    wide = tmp_path / "wide.csv"
+    pl.DataFrame({f"col{i:02d}": ["x"] for i in range(40)}).write_csv(wide)
+    app = NormalizeApp()
+    async with app.run_test(size=(70, 20)) as pilot:
+        app.load_path(wide)
+        await pilot.pause()
+        sidebar = app.screen.query_one("#sidebar", ColumnSidebar)
+        scroll = sidebar.query_one(VerticalScroll)
+        assert scroll.max_scroll_y > 0
+
+        # all 40 columns present in the scrolled content, lines built for
+        # the scrollbar-reduced inner width so none wraps
+        lines = sidebar.content_text.plain.split("\n")
+        assert len(lines) == 41
+        assert max(len(l) for l in lines) <= 33
+        scroll.scroll_end(animate=False)
+        await pilot.pause()
+        assert scroll.scroll_offset.y == scroll.max_scroll_y
+
+        # short file: fits, nothing to scroll
+        small = tmp_path / "small.csv"
+        pl.DataFrame({f"col{i:02d}": ["x"] for i in range(6)}).write_csv(small)
+        app.load_path(small)
+        await pilot.pause()
+        assert sidebar.query_one(VerticalScroll).max_scroll_y == 0
+
+
 async def test_large_file_previews_random_sample(tmp_path):
     """>250-row files preview 250 random rows, not the first 250; the same
     sample stays stable across preview refreshes within one load.
@@ -121,7 +155,7 @@ async def test_sidebar_shows_dtype_marks(csv_path):
         app.load_path(csv_path)
         await pilot.pause()
         sidebar = app.screen.query_one("#sidebar", ColumnSidebar)
-        text = sidebar.render()
+        text = sidebar.content_text
         lines = text.plain.split("\n")
         assert lines[0] == "Columns (4)"
         # every column line shows its dtype mark at a fixed slice: position 2,
@@ -153,7 +187,7 @@ async def test_sidebar_truncates_long_names(csv_path):
         infos = list(app.analyzed.values()) + [ColumnInfo("X" * 40, "String", 5)]
         sidebar.set_infos(infos)
         await pilot.pause()
-        text = sidebar.render()
+        text = sidebar.content_text
         lines = text.plain.split("\n")
         # inner width: 39 - 2 (border) - 2 (padding) = 35
         assert all(len(line) <= 35 for line in lines)
