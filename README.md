@@ -36,42 +36,19 @@ uvx normalize-tabular-data==0.1.0
 uv run normalize-tabular-data
 ```
 
-### The TestPyPI sandbox
-
-The test build (uploaded via `make testpypi`) is not on PyPI; point uv
-at TestPyPI first and PyPI as the fallback index — the tool itself is
-found on TestPyPI, its dependencies (`textual`, `polars`, …) on PyPI:
-
-```bash
-uvx \
-  --index-url https://test.pypi.org/simple/ \
-  --extra-index-url https://pypi.org/simple/ \
-  normalize-tabular-data==0.1.0
-
-# or installed persistently:
-uv tool install \
-  --index-url https://test.pypi.org/simple/ \
-  --extra-index-url https://pypi.org/simple/ \
-  normalize-tabular-data==0.1.0
-```
-
-uv caches resolved packages aggressively: after a TestPyPI re-upload of
-the same version, add `--refresh-package normalize-tabular-data` so it
-re-consults the index rather than reusing the cached artifact.
-
 ## Usage
 
 Launch with `normalize-tabular-data`. Keys:
 
-| Key | Action                      |
-|-----|-----------------------------|
-| `f` | (F)ile — open a file        |
-| `o` | (O)peration — choose an op  |
-| `p` | (P)lay script — reapply a saved `.ntd` sequence |
-| `u` | (U)ndo last applied step    |
-| `r` | (R)edo                      |
-| `s` | (S)ave the data in a format |
-| `q` | (Q)uit                      |
+| Key | Action                       |
+|-----|------------------------------|
+| `f` | (F)ile — open a file         |
+| `o` | (O)peration — choose an op   |
+| `p` | (P)lay script — apply `.ntd` |
+| `u` | (U)ndo last applied step     |
+| `r` | (R)edo                       |
+| `s` | (S)ave the data in a format  |
+| `q` | (Q)uit                       |
 
 ## Operations
 
@@ -122,7 +99,7 @@ renames, trims or splits is missing, the operation is unknown — playing
 stops with an alert naming the failing step, and every step the script had
 already applied is rolled back, so the table is left exactly as it was.
 
-![TUI preview](docs/screenshot.png)
+![TUI preview](https://raw.githubusercontent.com/SEIU-Tech/normalize-tabular-data/main/docs/screenshot.png)
 
 ## Publishing
 
