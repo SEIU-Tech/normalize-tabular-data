@@ -27,10 +27,12 @@ uv tool upgrade normalize-tabular-data
 ```bash
 uvx normalize-tabular-data
 # pin a specific version:
-uvx normalize-tabular-data==0.1.0
+uvx normalize-tabular-data==0.1.1
 ```
 
-### Straight from a checkout
+### From a git checkout
+
+Within the directory of the cloned repository:
 
 ```bash
 uv run normalize-tabular-data
@@ -82,11 +84,14 @@ The script is plain ASCII text, one operation per line, e.g.:
 
 ```
 # normalize-tabular-data script
-# source: employees.csv
-# table: /data/employees-normalized.csv
+# source: worksite.csv
+# table: /data/worksite-normalized.csv
 # saved: 2026-10-05T12:30:11
-trim_collapse(columns=["Dept", "Name"])
-date_normalize(column="Hired Date")
+date_normalize(column="Signed Up")
+trim_collapse(columns=["Full Name", "Worksite", "Job Class"])
+split_column(column="Full Name", delimiter="")
+rename_single(column="Full Name_1", new_name="First Name")
+rename_single(column="Full Name_2", new_name="Last Name")
 ```
 
 ## Playing a script back
