@@ -10,13 +10,54 @@ Load a file, see a preview, build up a pipeline of normalization operations
 combine/split columns, drop columns), then save the
 cleaned result.
 
-## Install
+## Running
+
+### Persistent install
 
 ```bash
 uv tool install normalize-tabular-data
-# or run directly from a checkout:
+# upgrade later with:
+uv tool upgrade normalize-tabular-data
+```
+
+### Ephemeral run (no install)
+
+`uvx` fetches into a throwaway environment each time:
+
+```bash
+uvx normalize-tabular-data
+# pin a specific version:
+uvx normalize-tabular-data==0.1.0
+```
+
+### Straight from a checkout
+
+```bash
 uv run normalize-tabular-data
 ```
+
+### The TestPyPI sandbox
+
+The test build (uploaded via `make testpypi`) is not on PyPI; point uv
+at TestPyPI first and PyPI as the fallback index — the tool itself is
+found on TestPyPI, its dependencies (`textual`, `polars`, …) on PyPI:
+
+```bash
+uvx \
+  --index-url https://test.pypi.org/simple/ \
+  --extra-index-url https://pypi.org/simple/ \
+  normalize-tabular-data==0.1.0
+
+# or installed persistently:
+uv tool install \
+  --index-url https://test.pypi.org/simple/ \
+  --extra-index-url https://pypi.org/simple/ \
+  normalize-tabular-data==0.1.0
+```
+
+uv caches resolved packages aggressively: after a TestPyPI re-upload of
+the same version, add `--refresh-package normalize-tabular-data` so it
+re-consults the index rather than reusing the cached artifact.
 
 ## Usage
 
