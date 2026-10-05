@@ -79,6 +79,24 @@ def excel_sheets(path: Path) -> list[str]:
     return list(fastexcel.read_excel(path).sheet_names)
 
 
+def _second_resolution(df: pl.DataFrame) -> pl.DataFrame:
+    """Datetime columns serialized as canonical UTC second-resolution text.
+
+    Used only for the text formats (CSV/TSV/JSONL): polars pads datetime
+    output with sub-second digits no matter the unit, and the canonical
+    text form carries no fractional part. Parquet and Excel keep the real
+    Datetime values (millisecond resolution)."""
+    datetime_cols = [
+        c for c, dtype in df.schema.items() if isinstance(dtype, pl.Datetime)
+    ]
+    if not datetime_cols:
+        return df
+    return df.with_columns(
+        pl.col(c).dt.truncate("1s").dt.to_string("%Y-%m-%dT%H:%M:%S")
+        for c in datetime_cols
+    )
+
+
 def write_table(
     df: pl.DataFrame,
     path: Path,
@@ -86,11 +104,11 @@ def write_table(
     sheet_name: str = "data",
 ) -> None:
     if fmt == "csv":
-        df.write_csv(path)
+        _second_resolution(df).write_csv(path)
     elif fmt == "tsv":
-        df.write_csv(path, separator="\t")
+        _second_resolution(df).write_csv(path, separator="\t")
     elif fmt == "jsonl":
-        df.write_ndjson(path)
+        _second_resolution(df).write_ndjson(path)
     elif fmt == "parquet":
         df.write_parquet(path)
     elif fmt == "xlsx":

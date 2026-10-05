@@ -427,6 +427,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastexcel" },
     { name = "gnosis-date-parser" },
+    { name = "platformdirs" },
     { name = "polars" },
     { name = "textual" },
     { name = "xlsxwriter" },
@@ -444,6 +445,7 @@ dev = [
 requires-dist = [
     { name = "fastexcel", specifier = ">=0.10" },
     { name = "gnosis-date-parser", specifier = ">=1.0.4" },
+    { name = "platformdirs", specifier = ">=3.0" },
     { name = "polars", specifier = ">=1.44,<2" },
     { name = "textual", specifier = ">=8.2.8" },
     { name = "xlsxwriter", specifier = ">=0.9" },

@@ -1,5 +1,7 @@
 """Interactive pilot tests: drive the actual TUI key flows end to end."""
 
+from datetime import datetime
+
 import polars as pl
 import pytest
 
@@ -29,7 +31,7 @@ async def test_open_via_keys_and_apply_dates_via_keys(csv_path):
         table = app.screen.query_one("#preview", DataTable)
         assert table.row_count == 4
 
-        # n: choose op — first item is "Normalize dates"; Enter selects it
+        # n: choose op — first item is "Normalize date(t)imes"; Enter selects it
         await pilot.press("o")
         await pilot.pause()
         assert app.screen.__class__.__name__ == "OpChooserModal"
@@ -41,8 +43,8 @@ async def test_open_via_keys_and_apply_dates_via_keys(csv_path):
         app.screen.action_ok()
         await pilot.pause()
         current = app.pipeline.current()
-        assert current["Hired Date"].to_list()[0] == "2022-03-22T00:00:00"
-        assert current["Hired Date"].dtype == pl.String
+        assert current["Hired Date"].to_list()[0] == datetime(2022, 3, 22)
+        assert current["Hired Date"].dtype == pl.Datetime("ms")
         assert not hasattr(app, "pending")  # removed two-step flow
 
         # u: undo restores the original data
@@ -164,18 +166,27 @@ async def test_op_chooser_hotkeys(sample_csv_path):
         listing = app.screen.query_one("#oplist")
         titles = [item.query_one(Label).visual.plain for item in listing.children]
         assert titles == [
+            "Normalize date(t)imes",
             "Normalize (d)ates",
             "Trim (w)hitespace",
-            "Dedu(p)licate rows",
             "(C)ombine columns",
             "(S)plit column",
             "(R)emove columns",
+            "Dedu(p)licate rows",
         ]
-        # press 'd' — jumps straight into the date op's parameters
+        # press 'd' — jumps straight into the date-only op's parameters
         await pilot.press("d")
         await pilot.pause()
         assert app.screen.__class__.__name__ == "OpParamsModal"
-        assert app.screen.dialog_title == "Normalize dates"
+        assert app.screen.dialog_title == "Normalize (d)ates"
+        # 't' — the datetime variant
+        await pilot.press("escape")
+        await pilot.pause()
+        await pilot.press("o")
+        await pilot.pause()
+        await pilot.press("t")
+        await pilot.pause()
+        assert app.screen.dialog_title == "Normalize date(t)imes"
         await pilot.press("escape")
         await pilot.pause()
         # 'p' — deduplicate
@@ -569,12 +580,16 @@ async def test_save_with_script_dialog(csv_path, tmp_path):
         assert any(".ntd" in t for t in help_texts)  # help mentions the ext
         suggested = script_modal.path_input.value
         assert suggested == str(tmp_path / "out.ntd")
+        # the extension is not the user's to change: anything typed is
+        # made to end in .ntd
+        script_modal.path_input.value = str(tmp_path / "out.savetxt")
         script_modal.action_ok()
         await pilot.pause()
 
         assert table_out.exists()
         script_path = tmp_path / "out.ntd"
         assert script_path.exists()
+        assert not (tmp_path / "out.savetxt").exists()
         lines = script_path.read_text().strip().split("\n")
         assert lines[0] == "# normalize-tabular-data script"
         assert f'bootstrap(table="{table_out}")' not in "".join(lines)
@@ -583,23 +598,6 @@ async def test_save_with_script_dialog(csv_path, tmp_path):
             'trim_collapse(columns=["Notes"])',
             'rename_single(column="Dept", new_name="dept_code")',
         ]
-
-        # extension override: save again under a different suffix
-        table_out2 = tmp_path / "out2.csv"
-        app.load_path(csv_path)
-        await pilot.pause()
-        await pilot.press("s")
-        await pilot.pause()
-        modal = app.screen
-        modal.path_input.value = str(table_out2)
-        modal.save_script.value = True
-        modal.action_ok()
-        await pilot.pause()
-        script_modal = app.screen
-        script_modal.path_input.value = str(tmp_path / "renamed-seq.custom")
-        script_modal.action_ok()
-        await pilot.pause()
-        assert (tmp_path / "renamed-seq.custom").exists()
 
 
 async def test_save_without_script_no_dialog(csv_path, tmp_path):
@@ -741,8 +739,8 @@ async def test_play_script_applies_steps_to_open_file(csv_path, tmp_path):
         await pilot.pause()
         current = app.pipeline.current()
         assert current["Dept"][0] == "Engineering"  # was "  Engineering "
-        assert current["Hired Date"].dtype == pl.String
-        assert current["Hired Date"][0] == "2022-03-22T00:00:00"
+        assert current["Hired Date"].dtype == pl.Datetime("ms")
+        assert current["Hired Date"][0] == datetime(2022, 3, 22)
         # steps recorded in the operation log exactly as written
         assert app.op_log == steps
 
@@ -803,8 +801,8 @@ async def test_play_committed_worksite_script(large_csv_path):
             "First Name",
             "Last Name",
         ]
-        assert current["Signed Up"].dtype == pl.String  # empty -> null
-        assert current["Signed Up"].to_list()[0] == "2020-12-12T00:00:00"
+        assert current["Signed Up"].dtype == pl.Datetime("ms")  # empty -> null
+        assert current["Signed Up"].to_list()[0] == datetime(2020, 12, 12)
         # the split tokens: first row "Quinn Huang" -> two non-null parts
         assert current["First Name"][0] == "Quinn"
         assert current["Last Name"][0] == "Huang"
@@ -1087,8 +1085,8 @@ async def test_initial_script_plays_after_load(tmp_path, csv_path):
         await pilot.pause()
         current = app.pipeline.current()
         assert current["Dept"].to_list()[0] == "Engineering"  # was "  Engineering "
-        assert current["Hired Date"].dtype == pl.String
-        assert current["Hired Date"].to_list()[0] == "2022-03-22T00:00:00"
+        assert current["Hired Date"].dtype == pl.Datetime("ms")
+        assert current["Hired Date"].to_list()[0] == datetime(2022, 3, 22)
         # both steps landed in the op log, in play order
         assert app.op_log == [
             ("trim_collapse", {"columns": ["Dept", "Notes"]}),

@@ -48,17 +48,20 @@ def _apply_date_normalize(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
     series = df.get_column(col)
     if series.dtype != pl.String:
         series = series.cast(pl.String)
-    # canonical UTC at second resolution: polars has no second-unit
-    # Datetime (ns/us/ms only, all of which print sub-second digits in
-    # every export), so the normalized column is the truncated
-    # `year-month-dayThh:mm:ss` string; fractional parts are dropped and
-    # unparseable values become null
+    # canonical UTC Datetime at millisecond resolution; unparseable -> null
     return df.with_columns(
-        date_parser.parse_series(series)
-        .dt.truncate("1s")
-        .dt.to_string("%Y-%m-%dT%H:%M:%S")
-        .alias(col)
+        date_parser.parse_series(series).dt.cast_time_unit("ms").alias(col)
     )
+
+
+def _apply_date_only(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
+    col: str = p["column"]
+    series = df.get_column(col)
+    if series.dtype != pl.String:
+        series = series.cast(pl.String)
+    # date-only ISO-8601: any input format condensed to the UTC calendar
+    # date; unparseable values become null
+    return df.with_columns(date_parser.parse_series(series).dt.date().alias(col))
 
 
 def _apply_trim_collapse(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
@@ -126,8 +129,8 @@ def _apply_split_column(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
 OPS: tuple[Operation, ...] = (
     Operation(
         key="date_normalize",
-        title="Normalize dates",
-        hotkey="d",
+        title="Normalize date(t)imes",
+        hotkey="t",
         params=(
             ParamSpec(
                 "column",
@@ -137,6 +140,20 @@ OPS: tuple[Operation, ...] = (
             ),
         ),
         apply=_apply_date_normalize,
+    ),
+    Operation(
+        key="date_only",
+        title="Normalize (d)ates",
+        hotkey="d",
+        params=(
+            ParamSpec(
+                "column",
+                "column",
+                "Date column",
+                help="Any input format; condenses to the UTC calendar date",
+            ),
+        ),
+        apply=_apply_date_only,
     ),
     Operation(
         key="trim_collapse",
@@ -151,22 +168,6 @@ OPS: tuple[Operation, ...] = (
             ),
         ),
         apply=_apply_trim_collapse,
-    ),
-    Operation(
-        key="dedup_rows",
-        title="Deduplicate rows",
-        hotkey="p",
-        params=(
-            ParamSpec("columns", "column_multi", "Key columns (empty = all)"),
-            ParamSpec(
-                "keep",
-                "choice",
-                "Keep",
-                default="first",
-                choices=("first", "last"),
-            ),
-        ),
-        apply=_apply_dedup_rows,
     ),
     Operation(
         key="combine_columns",
@@ -211,6 +212,22 @@ OPS: tuple[Operation, ...] = (
             ),
         ),
         apply=_apply_drop_columns,
+    ),
+    Operation(
+        key="dedup_rows",
+        title="Deduplicate rows",
+        hotkey="p",
+        params=(
+            ParamSpec("columns", "column_multi", "Key columns (empty = all)"),
+            ParamSpec(
+                "keep",
+                "choice",
+                "Keep",
+                default="first",
+                choices=("first", "last"),
+            ),
+        ),
+        apply=_apply_dedup_rows,
     ),
 )
 

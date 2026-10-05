@@ -108,6 +108,39 @@ def test_write_unknown_format(tmp_path):
         write_table(pl.DataFrame({"a": [1]}), tmp_path / "out.csv", "wacz")
 
 
+def test_datetime_exports_second_resolution_text_formats_only(tmp_path):
+    """CSV/TSV/JSONL serialize datetime columns to canonical UTC
+    second-resolution strings; Parquet and Excel keep the real Datetime
+    (millisecond resolution) values."""
+    import polars as pl
+    from datetime import datetime
+
+    df = pl.DataFrame(
+        {"d": [datetime(2022, 3, 22, 10, 15, 59, 673000), None]},
+        schema={"d": pl.Datetime("ms")},
+    )
+    # text formats: truncated to whole seconds as readable strings
+    for name, fmt in [("x.csv", "csv"), ("x.tsv", "tsv"), ("x.jsonl", "jsonl")]:
+        out = tmp_path / name
+        write_table(df, out, fmt)
+        back = read_table(out, fmt)
+        assert back["d"].dtype == pl.String, fmt
+        assert back["d"].to_list()[0].startswith("2022-03-22T10:15:59"), fmt
+        assert ".673" not in back["d"].to_list()[0] and back["d"][1] is None, fmt
+    # parquet/xlsx: real datetimes survive with their milliseconds
+    pq = tmp_path / "x.parquet"
+    write_table(df, pq, "parquet")
+    assert read_table(pq, "parquet")["d"].to_list()[0] == datetime(
+        2022, 3, 22, 10, 15, 59, 673000
+    )
+    xl = tmp_path / "x.xlsx"
+    write_table(df, xl, "xlsx")
+    got = read_table(xl, "xlsx")["d"].to_list()[0]
+    assert isinstance(got, datetime) and got == datetime(
+        2022, 3, 22, 10, 15, 59, 673000
+    )
+
+
 def test_script_text_shape():
     from normalize_tabular_data.io import SCRIPT_SUFFIX, script_text
 

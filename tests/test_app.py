@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import polars as pl
 import pytest
 
@@ -32,9 +34,9 @@ async def test_apply_date_op_through_pipeline(csv_path):
         app.pipeline.apply(OP_REGISTRY["date_normalize"], {"column": "Hired Date"})
         app.refresh_all()
         await pilot.pause()
-        assert app.pipeline.current()["Hired Date"].dtype == pl.String
-        assert (
-            app.pipeline.current()["Hired Date"].to_list()[0].startswith("2022-03-22T")
+        assert app.pipeline.current()["Hired Date"].dtype == pl.Datetime("ms")
+        assert app.pipeline.current()["Hired Date"].to_list()[0] == datetime(
+            2022, 3, 22
         )
         # undo restores the raw strings
         app.action_undo()
@@ -77,7 +79,7 @@ def test_dtype_marks():
     from normalize_tabular_data.widgets import _dtype_mark
 
     assert _dtype_mark("Datetime(time_unit='ns', time_zone=None)") == "dt "
-    assert _dtype_mark("Date") == "dt "
+    assert _dtype_mark("Date") == "day"
     assert _dtype_mark("Time") == "dt "
     assert _dtype_mark("String") == "str"
     assert _dtype_mark("Categorical(...)") == "str"
@@ -226,3 +228,42 @@ async def test_footer_renders_menu_style(csv_path):
                 ]
                 assert any(start <= 1 < end for start, end, _ in styled)
         await pilot.press("q")
+
+
+def test_theme_persists_user_selection(tmp_path):
+    """Choosing a theme writes its name to the app's configuration file."""
+    from normalize_tabular_data.app import NormalizeApp
+
+    config_dir = tmp_path / "config"
+    app = NormalizeApp(config_dir=config_dir)
+    app._app_ready = True  # a real run does this at mount
+    app.theme = "textual-light"
+    assert (config_dir / "theme").read_text(encoding="utf-8").strip() == (
+        "textual-light"
+    )
+
+
+async def test_theme_config_relaunches_with_saved_theme(tmp_path):
+    """The theme picked last time is applied when the app starts."""
+    from normalize_tabular_data.app import NormalizeApp
+
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "theme").write_text("textual-light\n", encoding="utf-8")
+    app = NormalizeApp(config_dir=config_dir)
+    async with app.run_test():
+        assert app.theme == "textual-light"
+
+
+async def test_theme_config_with_gone_theme_name(tmp_path):
+    """A saved theme that no longer exists is ignored; the app keeps the
+    default and still runs."""
+    from normalize_tabular_data.app import NormalizeApp
+    import textual.constants as constants
+
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "theme").write_text("vanished-theme-name\n", encoding="utf-8")
+    app = NormalizeApp(config_dir=config_dir)
+    async with app.run_test():
+        assert app.theme == constants.DEFAULT_THEME

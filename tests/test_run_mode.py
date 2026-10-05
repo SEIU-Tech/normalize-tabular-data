@@ -72,7 +72,10 @@ def test_run_output_option(sample_csv, tidy_script, tmp_path):
     result = cli(str(sample_csv), "-s", str(tidy_script), "-x", "-o", str(out))
     assert result.returncode == 0, result.stderr
     assert out.exists()
-    assert pl.read_parquet(out).height == 2
+    back = pl.read_parquet(out)
+    assert back.height == 2
+    # parquet keeps real datetimes (milliseconds), unlike the CSV exports
+    assert back["Hired Date"].dtype == pl.Datetime("ms")
     # no default file was made: -o chooses the destination
     assert not sample_csv.with_stem("sample-normalized").exists()
 

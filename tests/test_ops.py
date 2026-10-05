@@ -1,5 +1,6 @@
 import polars as pl
 import pytest
+from datetime import date, datetime
 
 from normalize_tabular_data.ops import (
     OP_REGISTRY,
@@ -18,20 +19,47 @@ def test_date_normalize():
         pl.DataFrame({"d": ["2022-03-22", "Mar 1, 2019", "garbage", None]}),
         {"column": "d"},
     )
-    # normalized dates are canonical UTC at second resolution: no
-    # sub-second digits anywhere in the saved data
+    # in-memory dates stay real UTC datetimes at millisecond resolution
+    # (the text exports serialize them to seconds; parquet/xlsx do not)
+    assert df["d"].dtype == pl.Datetime("ms")
     assert df["d"].to_list() == [
-        "2022-03-22T00:00:00",
-        "2019-03-01T00:00:00",
+        datetime(2022, 3, 22),
+        datetime(2019, 3, 1),
         None,
         None,
     ]
-    assert df["d"].dtype == pl.String
-    # even a fractioned input truncates to seconds
+    # fractioned input keeps its milliseconds (truncated at ns -> ms)
     fract = op.apply(
         pl.DataFrame({"d": ["2022-03-22T10:15:59.673918"]}), {"column": "d"}
     )
-    assert fract["d"].to_list() == ["2022-03-22T10:15:59"]
+    assert fract["d"].to_list()[0] == datetime(2022, 3, 22, 10, 15, 59, 673000)
+
+
+def test_date_only():
+    op = OP_REGISTRY["date_only"]
+    df = op.apply(
+        pl.DataFrame(
+            {
+                "d": [
+                    "2022-03-22",
+                    "Mar 1, 2019",
+                    "2021-02-13T03:04:00",
+                    "garbage",
+                    None,
+                ]
+            }
+        ),
+        {"column": "d"},
+    )
+    # date-only ISO-8601: any input condenses to the UTC calendar date
+    assert df["d"].dtype == pl.Date
+    assert df["d"].to_list() == [
+        date(2022, 3, 22),
+        date(2019, 3, 1),
+        date(2021, 2, 13),
+        None,
+        None,
+    ]
 
 
 def test_trim_collapse():
@@ -105,7 +133,8 @@ def test_pipeline_recompute_and_undo_redo(sample_df):
     )
     cur = pipe.current()
     assert "Ops  " not in " ".join(cur["Dept"].to_list())
-    assert cur["Hired Date"][0].startswith("2022-03-22")
+    assert cur["Hired Date"].dtype == pl.Datetime("ms")
+    assert cur["Hired Date"][0] == datetime(2022, 3, 22)
 
     # undo: back to trimmed state (Hired Date still raw strings)
     assert pipe.undo()
@@ -116,8 +145,8 @@ def test_pipeline_recompute_and_undo_redo(sample_df):
 
     assert pipe.redo() and pipe.redo()  # re-apply both steps
     cur = pipe.current()
-    assert cur["Hired Date"].dtype == pl.String
-    assert cur["Hired Date"][0] == "2022-03-22T00:00:00"
+    assert cur["Hired Date"].dtype == pl.Datetime("ms")
+    assert cur["Hired Date"][0] == datetime(2022, 3, 22)
     assert len(pipe.step_summary()) == 2
 
 
@@ -128,8 +157,8 @@ def test_pipeline_applies_recompute_from_source(sample_df):
     # recompute folds all steps from the original source
     cur = pipe.current()
     assert cur["Notes"].to_list() == ["", "", "Alice Doe", ""]
-    assert cur["Hired Date"].dtype == pl.String
-    assert cur["Hired Date"].to_list()[0] == "2022-03-22T00:00:00"
+    assert cur["Hired Date"].dtype == pl.Datetime("ms")
+    assert cur["Hired Date"].to_list()[0] == datetime(2022, 3, 22)
 
 
 def test_analyze_column_flags_date_candidate():
@@ -145,6 +174,7 @@ def test_analyze_column_flags_date_candidate():
 def test_registry_complete():
     assert set(OP_REGISTRY) == {
         "date_normalize",
+        "date_only",
         "trim_collapse",
         "dedup_rows",
         "combine_columns",

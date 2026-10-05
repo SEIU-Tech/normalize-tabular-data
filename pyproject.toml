@@ -15,6 +15,7 @@ dependencies = [
     "polars>=1.44,<2",
     "fastexcel>=0.10",
     "xlsxwriter>=0.9",
+    "platformdirs>=3.0",
 ]
 
 [dependency-groups]
