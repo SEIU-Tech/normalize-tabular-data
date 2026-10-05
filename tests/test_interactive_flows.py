@@ -72,7 +72,9 @@ async def test_quit_binding(csv_path):
         await pilot.press("q")
 
 
-async def test_save_via_keys(csv_path, tmp_path, monkeypatch):
+async def test_save_via_keys_infer_format_from_extension(csv_path, tmp_path):
+    """The save dialog has no format picker: the extension chooses the
+    format, and an unsupported extension is rejected with a notice."""
 
     app = NormalizeApp()
     async with app.run_test() as pilot:
@@ -81,10 +83,22 @@ async def test_save_via_keys(csv_path, tmp_path, monkeypatch):
         await pilot.press("s")
         await pilot.pause()
         assert app.screen.__class__.__name__ == "SaveModal"
+        modal = app.screen
+        # the permitted extensions are listed as static help text
+        help_texts = [s.visual.plain for s in modal.query("Static.help")]
+        assert any(".xlsx" in t and ".csv" in t for t in help_texts)
+
+        # an unknown extension is refused and keeps the dialog open
+        fake = tmp_path / "out.xyz"
+        modal.path_input.value = str(fake)
+        modal.action_ok()
+        await pilot.pause()
+        assert not fake.exists()
+
+        # .tsv infers tsv without any picker
         fake = tmp_path / "out.tsv"
-        app.screen.path_input.value = str(fake)
-        app.screen.fmt_choice.value = "tsv"
-        app.screen.action_ok()
+        modal.path_input.value = str(fake)
+        modal.action_ok()
         await pilot.pause()
         assert fake.exists()
         df = pl.read_csv(fake, separator="\t")
@@ -212,9 +226,7 @@ async def test_open_dialog_moves_up_a_directory(sample_data_dir, sample_csv_path
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
-        csv_index = [item.name for item in listing.children].index(
-            str(sample_csv_path)
-        )
+        csv_index = [item.name for item in listing.children].index(str(sample_csv_path))
         listing.index = csv_index
         await pilot.pause()
         await pilot.press("enter")
@@ -296,7 +308,11 @@ async def test_rename_column_via_header_click(sample_csv_path):
         # undo restores the original name before the rename
         app.action_undo()
         assert app.pipeline.current().columns == [
-            "member_id", "Hired Date", "Dept", "Name", "Zip",
+            "member_id",
+            "Hired Date",
+            "Dept",
+            "Name",
+            "Zip",
         ]
 
 
@@ -352,9 +368,9 @@ async def test_op_params_modal_docks_in_sidebar(large_csv_path):
         assert app.screen.__class__.__name__ == "OpParamsModal"
         box = app.screen.query_one(Vertical)
         box_region = box.region
-        table = [
-            s for s in app.screen_stack if type(s).__name__ == "MainScreen"
-        ][0].query_one("#preview", DataTable)
+        table = [s for s in app.screen_stack if type(s).__name__ == "MainScreen"][
+            0
+        ].query_one("#preview", DataTable)
 
         # dialog box lives inside the sidebar strip; nothing covers the table
         assert box_region.x + box_region.width <= table.region.x
@@ -375,8 +391,13 @@ async def test_open_100_row_file_via_dialog(large_csv_path):
         await pilot.pause()
 
         expected = [
-            "employee_id", "Full Name", "Worksite", "Job Class",
-            "Dues Status", "Signed Up", "Shift Code",
+            "employee_id",
+            "Full Name",
+            "Worksite",
+            "Job Class",
+            "Dues Status",
+            "Signed Up",
+            "Shift Code",
         ]
         assert app.pipeline.current().columns == expected
         assert app.pipeline.current().height == 100
@@ -386,7 +407,12 @@ async def test_open_100_row_file_via_dialog(large_csv_path):
         assert (table.row_count, len(table.columns)) == (100, 7)
         # every distinct worksite phrase from the file is visible somewhere
         first_col = app.pipeline.current()["Worksite"].to_list()
-        assert set(first_col) >= {"Hospital A", "Hospital B", "Logistics Yard", "Residence Hall"}
+        assert set(first_col) >= {
+            "Hospital A",
+            "Hospital B",
+            "Logistics Yard",
+            "Residence Hall",
+        }
 
 
 async def test_nulls_display_as_marker(sample_csv_path):
@@ -446,8 +472,12 @@ async def test_split_column_op_applies(large_csv_path):
         # in order, then one output column per token of the widest name
         cols = app.pipeline.current().columns
         assert cols[:6] == [
-            "employee_id", "Worksite", "Job Class", "Dues Status",
-            "Signed Up", "Shift Code",
+            "employee_id",
+            "Worksite",
+            "Job Class",
+            "Dues Status",
+            "Signed Up",
+            "Shift Code",
         ]
         assert cols[6:] == [f"Full Name_{i}" for i in range(1, tokens + 1)]
         assert "Full Name" not in cols

@@ -18,7 +18,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8", "pytest-asyncio>=0.25"]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.25",
+    "ruff>=0.16.10",
+]
 
 [project.scripts]
 normalize-tabular-data = "normalize_tabular_data:main"

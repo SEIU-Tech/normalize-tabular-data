@@ -17,9 +17,10 @@ from textual.widgets import (
     ListView,
     Select,
     SelectionList,
+    Static,
 )
 
-from normalize_tabular_data.io import FORMAT_SUFFIX
+from normalize_tabular_data.io import WRITE_SUFFIXES
 from normalize_tabular_data.ops import Operation
 
 
@@ -250,9 +251,7 @@ class OpParamsModal(ModalDialog):
             elif spec.kind == "column":
                 col_names = self._available_columns()
                 preselect = (
-                    candidates[0]
-                    if candidates and candidates[0] in col_names
-                    else None
+                    candidates[0] if candidates and candidates[0] in col_names else None
                 )
                 sel = Select(
                     [(name, name) for name in col_names],
@@ -321,7 +320,9 @@ class OpParamsModal(ModalDialog):
             if spec.kind == "column_multi":
                 params[spec.name] = list(widget.selected)
             elif spec.kind == "column":
-                params[spec.name] = None if widget.value is Select.NULL else widget.value
+                params[spec.name] = (
+                    None if widget.value is Select.NULL else widget.value
+                )
             elif spec.kind == "number":
                 raw = widget.value.strip()
                 params[spec.name] = int(raw) if raw else None
@@ -359,24 +360,17 @@ class SaveModal(ModalDialog):
 
     def compose_body(self) -> ComposeResult:
         path_stub = self.suggested or Path("normalized.csv")
-        suffix_to_fmt = {v: k for k, v in FORMAT_SUFFIX.items()}
-        fmt = suffix_to_fmt.get(path_stub.suffix.lower(), "csv")
         self.path_input = Input(
             placeholder=str(path_stub),
             value=str(path_stub),
             id="save_input",
         )
-        self.fmt_choice = Select(
-            [(f".{suffix}", name) for name, suffix in sorted(FORMAT_SUFFIX.items())],
-            allow_blank=False,
-            value=fmt,
-            id="save_format",
-        )
         self.overwrite = Checkbox(
             "Allow overwrite if file exists", False, id="allow_overwrite"
         )
+        extensions = " ".join(sorted(WRITE_SUFFIXES))
         yield self.path_input
-        yield self.fmt_choice
+        yield Static(f"Extensions: {extensions}", classes="help")
         yield self.overwrite
 
     def action_ok(self) -> None:
@@ -385,13 +379,21 @@ class SaveModal(ModalDialog):
             self.app.notify("Type a file name or path", severity="error")
             return
         target = Path(raw).expanduser()
+        fmt = WRITE_SUFFIXES.get(target.suffix.lower())
+        if fmt is None:
+            self.app.notify(
+                "Unsupported extension: use one of "
+                + ", ".join(sorted(WRITE_SUFFIXES)),
+                severity="error",
+            )
+            return
         if target.exists() and not self.overwrite.value:
             self.app.notify(
                 "File exists: tick the overwrite box or pick another path",
                 severity="warning",
             )
             return
-        self.post_result((target, self.fmt_choice.value))
+        self.post_result((target, fmt))
 
     @on(Input.Submitted, "#save_input")
     def _save_input_submit(self) -> None:

@@ -44,8 +44,8 @@ def test_csv_infers_types_from_10k_rows(tmp_path):
     out = tmp_path / "late_type_change.csv"
     out.write_text(
         "id\n"
-        + "\n".join(str(i) for i in range(150))       # numeric head
-        + "\nlate-string\n"                            # past the old sample
+        + "\n".join(str(i) for i in range(150))  # numeric head
+        + "\nlate-string\n"  # past the old sample
         + "\n".join(str(i) for i in range(151, 300))
         + "\n"
     )
@@ -62,7 +62,7 @@ def test_csv_falls_back_to_all_strings_after_inference_window(tmp_path):
     out.write_text(
         "id,x\n"
         + "\n".join(f"{i},{i / 2}" for i in range(10_500))  # numeric head
-        + "\nlate-condition,-1\n"                           # past the window
+        + "\nlate-condition,-1\n"  # past the window
         + "\n".join(f"{i},{i / 2}" for i in range(10_501, 11_000))
         + "\n"
     )

@@ -22,14 +22,14 @@ uv run normalize-tabular-data
 
 Launch with `normalize-tabular-data`. Keys:
 
-| Key | Action |
-|-----|--------|
-| `f` | (F)ile — open a file |
-| `o` | (O)peration — choose an operation (applied immediately after confirming parameters) |
-| `u` | (U)ndo last applied step |
-| `r` | (R)edo |
-| `s` | (S)ave the normalized table |
-| `q` | (Q)uit |
+| Key | Action                      |
+|-----|-----------------------------|
+| `f` | (F)ile — open a file        |
+| `o` | (O)peration — choose an op  |
+| `u` | (U)ndo last applied step    |
+| `r` | (R)edo                      |
+| `s` | (S)ave the data in a format |
+| `q` | (Q)uit                      |
 
 ## Operations
 
@@ -56,5 +56,6 @@ still runs on the full data.
 
 ## License
 
-BSD 2-Clause. Copyright (c) 2026, Members of Service Employees International
-Union (SEIU). See [LICENSE](LICENSE).
+BSD 2-Clause. Copyright (c) 2026, Service Employees International Union (SEIU). 
+
+See [LICENSE](LICENSE).

@@ -21,6 +21,7 @@ def large_csv_path() -> Path:
     """Second committed sample: 100 rows, different schema (worksite data)."""
     return DATA_DIR / "large_worksite.csv"
 
+
 SAMPLE_DATA = {
     "id": ["1", "2", "3", "4"],
     "Hired Date": ["2022-03-22", "Mar 1, 2019", "", "Sept 5 2021"],

@@ -97,10 +97,16 @@ def _dtype_mark(dtype: str) -> str:
     everything else oth. Each mark is padded to 3 columns so column
     names left-align."""
     for prefix, mark in (
-        ("Datetime", "dt "), ("Date", "dt "), ("Time", "dt "),
-        ("String", "str"), ("Categorical", "str"), ("Enum", "str"),
-        ("Int", "int"), ("UInt", "int"),
-        ("Float", "dec"), ("Decimal", "dec"),
+        ("Datetime", "dt "),
+        ("Date", "dt "),
+        ("Time", "dt "),
+        ("String", "str"),
+        ("Categorical", "str"),
+        ("Enum", "str"),
+        ("Int", "int"),
+        ("UInt", "int"),
+        ("Float", "dec"),
+        ("Decimal", "dec"),
         ("Boolean", "t/f"),
     ):
         if dtype.startswith(prefix):

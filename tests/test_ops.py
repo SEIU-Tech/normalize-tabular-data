@@ -1,4 +1,3 @@
-
 import polars as pl
 import pytest
 
@@ -12,10 +11,17 @@ from normalize_tabular_data.ops import (
 
 # --- individual operations ---------------------------------------------------
 
+
 def test_date_normalize():
     op = OP_REGISTRY["date_normalize"]
-    df = op.apply(pl.DataFrame({"d": ["2022-03-22", "Mar 1, 2019", "garbage", None]}), {"column": "d"})
-    iso = [dt.strftime("%Y-%m-%dT%H:%M:%S") if dt is not None else None for dt in df["d"].to_list()]
+    df = op.apply(
+        pl.DataFrame({"d": ["2022-03-22", "Mar 1, 2019", "garbage", None]}),
+        {"column": "d"},
+    )
+    iso = [
+        dt.strftime("%Y-%m-%dT%H:%M:%S") if dt is not None else None
+        for dt in df["d"].to_list()
+    ]
     assert iso == ["2022-03-22T00:00:00", "2019-03-01T00:00:00", None, None]
     assert df["d"].dtype == pl.Datetime("ns")
 
@@ -68,7 +74,10 @@ def test_unknown_column_raises_validation():
 def test_combine_requires_two_and_unique_name():
     pipe = Pipeline(pl.DataFrame({"a": ["1"], "b": ["2"]}))
     with pytest.raises(ValueError, match="at least 2"):
-        pipe.apply(OP_REGISTRY["combine_columns"], {"columns": ["a"], "separator": "-", "new_name": "c"})
+        pipe.apply(
+            OP_REGISTRY["combine_columns"],
+            {"columns": ["a"], "separator": "-", "new_name": "c"},
+        )
     with pytest.raises(ValueError, match="already exists"):
         pipe.apply(
             OP_REGISTRY["combine_columns"],
@@ -77,6 +86,7 @@ def test_combine_requires_two_and_unique_name():
 
 
 # --- pipeline ----------------------------------------------------------------
+
 
 def test_pipeline_recompute_and_undo_redo(sample_df):
     pipe = Pipeline(sample_df)
@@ -87,7 +97,10 @@ def test_pipeline_recompute_and_undo_redo(sample_df):
     )
     cur = pipe.current()
     assert "Ops  " not in " ".join(cur["Dept"].to_list())
-    iso = [dt.strftime("%Y-%m-%d") if dt is not None else None for dt in cur["Hired Date"].to_list()]
+    iso = [
+        dt.strftime("%Y-%m-%d") if dt is not None else None
+        for dt in cur["Hired Date"].to_list()
+    ]
     assert iso[0] == "2022-03-22"
 
     # undo: back to trimmed state (Hired Date still raw strings)
@@ -125,9 +138,12 @@ def test_analyze_column_flags_date_candidate():
 
 def test_registry_complete():
     assert set(OP_REGISTRY) == {
-        "date_normalize", "trim_collapse",
-        "dedup_rows", "combine_columns",
-        "split_column", "remove_columns",
+        "date_normalize",
+        "trim_collapse",
+        "dedup_rows",
+        "combine_columns",
+        "split_column",
+        "remove_columns",
     }
     assert all(isinstance(o, Operation) for o in OP_REGISTRY.values())
     # the header-click rename is internal: it exists but is not offered
@@ -168,7 +184,10 @@ def test_split_column_width_chosen_from_data():
     assert df["v_4"].to_list() == [None, None, "d"]
     # short values pad with null, not empty strings
     assert df.filter(pl.col("v_2").is_null()).to_dicts()[0] == {
-        "v_1": "a", "v_2": None, "v_3": None, "v_4": None,
+        "v_1": "a",
+        "v_2": None,
+        "v_3": None,
+        "v_4": None,
     }
 
 

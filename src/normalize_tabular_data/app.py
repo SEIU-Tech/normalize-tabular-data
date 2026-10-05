@@ -10,6 +10,7 @@ from typing import Any
 
 from textual import on
 from textual.app import App, ComposeResult
+from textual.content import Content
 from textual.containers import Horizontal
 from textual.events import Key
 from textual.screen import Screen
@@ -107,7 +108,11 @@ class OpChooserModal(ModalDialog):
             i = title.lower().find(hotkey.lower())
         else:
             i = next(
-                (i for i, c in enumerate(title) if c.isalnum() and c.lower() not in self._hotkeys),
+                (
+                    i
+                    for i, c in enumerate(title)
+                    if c.isalnum() and c.lower() not in self._hotkeys
+                ),
                 -1,
             )
         if i < 0:
@@ -117,7 +122,9 @@ class OpChooserModal(ModalDialog):
 
     def compose_body(self) -> ComposeResult:
         items = [
-            ListItem(Label(self._marked_title(op.key, op.title, op.hotkey)), name=op.key)
+            ListItem(
+                Label(self._marked_title(op.key, op.title, op.hotkey)), name=op.key
+            )
             for op in OP_REGISTRY.values()
         ]
         yield ListView(*items, id="oplist")
@@ -139,6 +146,25 @@ class OpChooserModal(ModalDialog):
             self.post_result(event.item.name)
 
 
+class AppHeader(Header):
+    """Header with the application name docked hard right (it previously
+    shared the centered title slot with the file/row info)."""
+
+    DEFAULT_CSS = """
+    AppHeader > Label.app_name {
+        dock: right;
+        height: 1;
+        margin-right: 2;
+        padding: 0 1;
+        color: $foreground-muted;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield from super().compose()
+        yield Label("normalize-tabular-data", classes="app_name")
+
+
 class MainScreen(Screen[None]):
     BINDINGS = [
         ("f", "app.open", "(F)ile"),
@@ -152,7 +178,7 @@ class MainScreen(Screen[None]):
     ]
 
     def compose(self) -> ComposeResult:
-        yield Header()
+        yield AppHeader()
         with Horizontal():
             yield ColumnSidebar(id="sidebar")
             yield PreviewTable(show_cursor=True, id="preview", cursor_type="row")
@@ -176,6 +202,11 @@ class NormalizeApp(App[None]):
         # preview sampling seed, redrawn per load so previews are a random
         # sample but stable across refreshes within one load
         self._preview_seed: int = 0
+
+    def format_title(self, title: str, sub_title: str) -> Content:
+        # centered header slot: file/row info only — the app name lives
+        # docked hard right in the header
+        return Content(sub_title)
 
     @property
     def current_columns(self) -> list[str]:
@@ -332,9 +363,7 @@ class NormalizeApp(App[None]):
             if new_name in self.pipeline.current().columns:
                 self.notify(f"{new_name!r} already exists", severity="error")
                 return
-            self._apply_now(
-                RENAME_OP, {"column": old_name, "new_name": new_name}
-            )
+            self._apply_now(RENAME_OP, {"column": old_name, "new_name": new_name})
 
         self.push_screen(RenameColumnModal(old_name), handle_result)
 

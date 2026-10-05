@@ -42,6 +42,7 @@ class Operation:
 
 # --- apply functions -------------------------------------------------------
 
+
 def _apply_date_normalize(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
     col: str = p["column"]
     series = df.get_column(col)
@@ -54,10 +55,7 @@ def _apply_date_normalize(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
 def _apply_trim_collapse(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
     cols: list[str] = p["columns"]
     return df.with_columns(
-        pl.col(c)
-        .cast(pl.String)
-        .str.strip_chars()
-        .str.replace_all(r"\s+", " ")
+        pl.col(c).cast(pl.String).str.strip_chars().str.replace_all(r"\s+", " ")
         for c in cols
     )
 
@@ -121,14 +119,28 @@ OPS: tuple[Operation, ...] = (
         key="date_normalize",
         title="Normalize dates",
         hotkey="d",
-        params=(ParamSpec("column", "column", "Date column", help="Any input format; unparseable -> null"),),
+        params=(
+            ParamSpec(
+                "column",
+                "column",
+                "Date column",
+                help="Any input format; unparseable -> null",
+            ),
+        ),
         apply=_apply_date_normalize,
     ),
     Operation(
         key="trim_collapse",
         title="Trim whitespace",
         hotkey="w",
-        params=(ParamSpec("columns", "column_multi", "Columns", help="Strip edges, collapse internal runs to one space"),),
+        params=(
+            ParamSpec(
+                "columns",
+                "column_multi",
+                "Columns",
+                help="Strip edges, collapse internal runs to one space",
+            ),
+        ),
         apply=_apply_trim_collapse,
     ),
     Operation(
@@ -137,7 +149,13 @@ OPS: tuple[Operation, ...] = (
         hotkey="p",
         params=(
             ParamSpec("columns", "column_multi", "Key columns (empty = all)"),
-            ParamSpec("keep", "choice", "Keep", default="first", choices=("first", "last")),
+            ParamSpec(
+                "keep",
+                "choice",
+                "Keep",
+                default="first",
+                choices=("first", "last"),
+            ),
         ),
         apply=_apply_dedup_rows,
     ),
@@ -163,7 +181,10 @@ OPS: tuple[Operation, ...] = (
                 "text",
                 "Delimiter",
                 default="",
-                help="Default split is on whitespace. If specified split on exact characters given.",
+                help=(
+                    "Default split is on whitespace. "
+                    "If specified, split on exact characters given."
+                ),
             ),
         ),
         apply=_apply_split_column,
@@ -199,6 +220,7 @@ RENAME_OP = Operation(
 
 
 # --- pipeline ---------------------------------------------------------------
+
 
 @dataclass
 class AppliedOp:
@@ -273,12 +295,15 @@ class Pipeline:
     def step_summary(self) -> list[str]:
         out = []
         for step in self.applied:
-            bits = " ".join(f"{k}={v}" for k, v in step.params.items() if v not in (None, ()))
+            bits = " ".join(
+                f"{k}={v}" for k, v in step.params.items() if v not in (None, ())
+            )
             out.append(f"{step.op.key}({bits})" if bits else step.op.key)
         return out
 
 
 # --- column analysis ---------------------------------------------------------
+
 
 @dataclass
 class ColumnInfo:
@@ -294,11 +319,7 @@ def analyze_column(df: pl.DataFrame, col: str) -> ColumnInfo:
     info = ColumnInfo(name=col, dtype=str(s.dtype), null_count=int(s.null_count()))
     if s.dtype == pl.String:
         sample = (
-            s.drop_nulls()
-            .str.strip_chars()
-            .replace("", None)
-            .drop_nulls()
-            .head(200)
+            s.drop_nulls().str.strip_chars().replace("", None).drop_nulls().head(200)
         )
         if sample.len() >= 3:
             parsed = date_parser.parse_series(sample)

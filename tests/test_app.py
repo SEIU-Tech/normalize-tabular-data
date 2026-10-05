@@ -162,14 +162,14 @@ async def test_sidebar_shows_dtype_marks(csv_path):
         # after the one-char date-candidate flag and one space. ("1","2","3","4"
         # in the csv round-trips as Int64)
         assert [line[2:5] for line in lines[1:]] == [
-            "int", "str", "str", "str",
+            "int",
+            "str",
+            "str",
+            "str",
         ]
         # the mark segment carries its own highlight style, distinct from text
         body_start = len("Columns (4)\n")
-        assert any(
-            "cyan" in str(s.style) and s.start >= body_start
-            for s in text.spans
-        )
+        assert any("cyan" in str(s.style) and s.start >= body_start for s in text.spans)
         await pilot.press("q")
 
 
