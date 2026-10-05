@@ -48,8 +48,17 @@ def _apply_date_normalize(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
     series = df.get_column(col)
     if series.dtype != pl.String:
         series = series.cast(pl.String)
-    # Datetime("ns"), unparseable -> null
-    return df.with_columns(date_parser.parse_series(series).alias(col))
+    # canonical UTC at second resolution: polars has no second-unit
+    # Datetime (ns/us/ms only, all of which print sub-second digits in
+    # every export), so the normalized column is the truncated
+    # `year-month-dayThh:mm:ss` string; fractional parts are dropped and
+    # unparseable values become null
+    return df.with_columns(
+        date_parser.parse_series(series)
+        .dt.truncate("1s")
+        .dt.to_string("%Y-%m-%dT%H:%M:%S")
+        .alias(col)
+    )
 
 
 def _apply_trim_collapse(df: pl.DataFrame, p: dict[str, Any]) -> pl.DataFrame:
@@ -222,6 +231,47 @@ RENAME_OP = Operation(
 # rename op (header-click renames are logged under the key "rename_single",
 # so saved scripts contain those lines and have to play back).
 PLAY_REGISTRY: dict[str, Operation] = {**OP_REGISTRY, RENAME_OP.key: RENAME_OP}
+
+
+def apply_script_steps(
+    steps: list[tuple[str, dict]],
+    pipeline: Pipeline,
+    op_log: list[tuple[str, Any]],
+    on_failure: Callable[[str], None],
+) -> bool:
+    """Apply a played script's steps to `pipeline`, all-or-nothing.
+
+    Each step is resolved against PLAY_REGISTRY, applied, and logged to
+    `op_log` (the same keys the interactive player records). On the first
+    step that is impossible for the currently loaded file the work done so
+    far is rolled back — `pipeline.applied` and `op_log` truncated to where
+    the script started and the redo stack cleared — and the failure reason
+    is passed to `on_failure`. Returns False when a step failed, in which
+    case `pipeline` is left exactly as it was before the call."""
+    started_applied = len(pipeline.applied)
+    started_log = len(op_log)
+
+    def give_up(reason: str) -> None:
+        del pipeline.applied[started_applied:]
+        pipeline.redo_stack.clear()
+        del op_log[started_log:]
+        on_failure(reason)
+
+    for index, (key, params) in enumerate(steps, 1):
+        op = PLAY_REGISTRY.get(key)
+        if op is None:
+            give_up(f"Step {index}: {key!r} is not a known operation")
+            return False
+        try:
+            pipeline.apply(op, params)
+            # the pipeline refolds lazily; fold now so an op-specific error
+            # (e.g. unparseable dates) rolls back this step too
+            pipeline.current()
+        except Exception as exc:
+            give_up(f"Step {index} of {len(steps)} ({op.title}) failed: {exc}")
+            return False
+        op_log.append((key, dict(params)))
+    return True
 
 
 # --- pipeline ---------------------------------------------------------------

@@ -104,21 +104,21 @@ def write_table(
 SCRIPT_SUFFIX = ".ntd"
 
 
+def step_line(key: str, params: dict) -> str:
+    """One operation description: `<key>(<param>=<json value>, ...)`."""
+    return f"{key}({', '.join(f'{p}={json.dumps(v)}' for p, v in params.items())})"
+
+
 def script_text(steps: list[tuple[str, dict]], header_fields: dict[str, str]) -> str:
     """Human-readable ASCII text, one operation description per line.
 
-    Every operation is `<key>(<param>=<json value>, ...)` so the lines stay
-    readable while remaining mechanically parseable for a future
-    "apply a script" capability. `header_fields` become leading `#`
+    Every operation is `step_line()`'s `<key>(<param>=<json value>, ...)`
+    so the lines stay readable while remaining mechanically parseable for a
+    future "apply a script" capability. `header_fields` become leading `#`
     comment lines (source file, save time, ...)"""
     lines = ["# normalize-tabular-data script"]
     lines += [f"# {text}" for text in header_fields.values() if text]
-    lines += [
-        f"{key}("
-        + ", ".join(f"{param}={json.dumps(value)}" for param, value in params.items())
-        + ")"
-        for key, params in steps
-    ]
+    lines += [step_line(key, params) for key, params in steps]
     return "\n".join(lines) + "\n"
 
 

@@ -38,6 +38,53 @@ Within the directory of the cloned repository:
 uv run normalize-tabular-data
 ```
 
+## Command line
+
+An optional `FILE` argument names a table to open at startup, as if you
+had picked it from the in-app dialog.
+
+```bash
+normalize-tabular-data data/members.csv      # or with uvx/uv run
+uvx normalize-tabular-data data/members.tsv
+```
+
+If the file is missing or its format cannot be read, the TUI still
+starts — it shows an alert toast and you can open something else.
+
+### Open with a script
+
+With `--script/-s`, an `.ntd` script is played on `FILE` as soon as it
+loads (same flow as the `p` key, same stop-and-rollback on a step that
+does not fit the file):
+
+```bash
+uvx normalize-tabular-data data/members.csv -s data/members.ntd
+```
+
+### Headless run (`-x`, `--run`)
+
+`--run/-x` skips the TUI: it opens `FILE`, plays `SCRIPT` step by step,
+saves the result and exits. Each operation prints to stdout as it is
+applied; anything else — including a failing step, named and rolled
+back exactly as the interactive player would — goes to stderr with a
+nonzero exit code.
+
+```bash
+# saves data/members-normalized.csv next to the original
+uvx normalize-tabular-data members.csv -s members.ntd -x
+
+# choose the destination (format taken from its extension):
+uvx normalize-tabular-data members.csv -s members.ntd -x -o out/members.parquet
+
+# write the CSV to a pipe instead:
+uvx normalize-tabular-data members.csv -s members.ntd -x -o - | gzip > clean.csv.gz
+```
+
+With `-o -` (attached `-o-` works too), the transformed table is written
+to stdout itself and the step lines are suppressed, so stdout carries
+only the data. After a successful run the confirmation line goes to
+stderr.
+
 ## Usage
 
 Launch with `normalize-tabular-data`. Keys:
@@ -55,7 +102,8 @@ Launch with `normalize-tabular-data`. Keys:
 ## Operations
 
 - **Normalize dates** — parse a messy date column of *any* input format into
-  canonical UTC datetimes; unparseable values become null.
+  canonical UTC `year-month-dayThh:mm:ss` values (second resolution;
+  fractional parts are truncated); unparseable values become null.
 - **Trim whitespace** — strip edges and collapse internal whitespace runs,
   per selected columns.
 - Rename a column — click its header in the preview and type the new name.
