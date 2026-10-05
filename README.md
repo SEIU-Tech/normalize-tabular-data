@@ -83,6 +83,23 @@ already applied is rolled back, so the table is left exactly as it was.
 
 ![TUI preview](docs/screenshot.png)
 
+## Publishing
+
+PyPI credentials live in `$HOME/.pypirc` (sections `[pypi]` and
+`[testpypi]`); uploads go through `twine`, which honors that file —
+`uv publish` does not read `.pypirc`, so it is not used here.
+
+```bash
+make dist       # build sdist+wheel into dist/ and run `twine check`
+make testpypi   # upload to the TestPyPI sandbox (login section [testpypi])
+make pypi       # upload to PyPI (login section [pypi])
+twine upload    # equivalent of `make pypi`, minus a fresh build
+```
+
+The targets fail fast if the package metadata does not pass `twine check`,
+and `twine` runs with `--non-interactive` so a missing or wrong
+credential aborts the upload instead of prompting mid-run.
+
 ## License
 
 BSD 2-Clause. Copyright (c) 2026, Service Employees International Union (SEIU). 
