@@ -28,6 +28,7 @@ from normalize_tabular_data.ops import (
     Operation,
     Pipeline,
     analyze_column,
+    apply_script_steps as ops_apply_script_steps,
 )
 from normalize_tabular_data.screens import (
     ModalDialog,
@@ -270,8 +271,22 @@ class NormalizeApp(App[None]):
     }
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        initial_file: str | Path | None = None,
+        initial_script: str | Path | None = None,
+    ) -> None:
         super().__init__()
+        # filesystem path to open when the app starts (the optional file
+        # named on the command line); loaded like a file chosen in-app
+        self.initial_file: Path | None = (
+            Path(initial_file) if initial_file is not None else None
+        )
+        # .ntd script played automatically once that file is loaded (the
+        # optional --script named on the command line); requires a file
+        self.initial_script: Path | None = (
+            Path(initial_script) if initial_script is not None else None
+        )
         self.path: Path | None = None
         self.pipeline: Pipeline | None = None
         self.analyzed: dict[str, Any] = {}
@@ -341,6 +356,11 @@ class NormalizeApp(App[None]):
     def on_mount(self) -> None:
         self.push_screen(MainScreen())
         self._refresh_steps()
+        # the command line's file, if any, is opened once the main screen
+        # is composed; load_path toasts a readable alert instead of
+        # crashing if it is unreadable or has an unsupported format
+        if self.initial_file is not None:
+            self.call_after_refresh(self.load_path, self.initial_file)
 
     # --- data plumbing ---------------------------------------------------
 
@@ -386,6 +406,11 @@ class NormalizeApp(App[None]):
         # pipeline is now set: re-evaluate the footer's enabled keys
         self.screen.refresh_bindings()
         self.notify(f"Loaded {path.name} ({df.height:,} rows x {df.width} columns)")
+        # --script named on the command line: play it as soon as its file
+        # is on screen (same flow as the P key, with the same rollback)
+        if self.initial_script is not None:
+            self.play_script_file(self.initial_script)
+            self.initial_script = None
 
     def analyze_columns(self) -> None:
         if self.pipeline is None:
@@ -499,49 +524,26 @@ class NormalizeApp(App[None]):
             return
         started_applied = len(self.pipeline.applied)
         started_log = len(self.op_log)
-        for index, (key, params) in enumerate(steps, 1):
-            op = PLAY_REGISTRY.get(key)
-            if op is None:
-                self._rollback_script(
-                    index,
-                    started_applied,
-                    started_log,
-                    f"Step {index}: {key!r} is not a known operation",
-                )
-                return
-            try:
-                self.pipeline.apply(op, params)
-                # the pipeline refolds lazily; fold now so an op-specific
-                # error (e.g. unparseable dates) rolls back this step too
-                self.pipeline.current()
-            except Exception as exc:
-                self._rollback_script(
-                    index,
-                    started_applied,
-                    started_log,
-                    f"Step {index} of {len(steps)} ({op.title}) failed: {exc}",
-                )
-                return
-            self.op_log.append((key, dict(params)))
+
+        def alert(reason: str) -> None:
+            # same alert the player has always shown: step description plus
+            # how much of the script had to be rolled back
+            undid = len(self.pipeline.applied) - started_applied
+            detail = (
+                f" — rolled back {undid} step{'s' if undid != 1 else ''}"
+                if undid
+                else ""
+            )
+            self.refresh_all()
+            self.notify(f"{reason}{detail}", severity="error")
+
+        if not ops_apply_script_steps(steps, self.pipeline, self.op_log, alert):
+            return
         self.refresh_all()
         count = len(steps)
         self.notify(
             f"Applied {count} step{'s' if count != 1 else ''} from {script_path.name}"
         )
-
-    def _rollback_script(
-        self, step: int, started_applied: int, started_log: int, reason: str
-    ) -> None:
-        """Undo everything a partially played script applied, then alert."""
-        undid = len(self.pipeline.applied) - started_applied
-        del self.pipeline.applied[started_applied:]
-        self.pipeline.redo_stack.clear()
-        del self.op_log[started_log:]
-        self.refresh_all()
-        detail = (
-            f" — rolled back {undid} step{'s' if undid != 1 else ''}" if undid else ""
-        )
-        self.notify(f"{reason}{detail}", severity="error")
 
     def _apply_now(self, op: Operation, params: dict[str, Any]) -> None:
         try:
