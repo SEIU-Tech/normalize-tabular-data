@@ -6,10 +6,13 @@ import bisect
 import datetime as _dt
 import random
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from textual import on
-from textual.app import App, ComposeResult
+from textual.app import App, ComposeResult, SystemCommand
+from textual.binding import Binding
+from textual.color import Color
+from textual.command import CommandPalette
 from textual.content import Content
 from textual.containers import Horizontal
 from textual.events import Key
@@ -17,8 +20,10 @@ from textual.screen import Screen
 from textual.widgets import DataTable, Header, Label, ListItem, ListView
 
 from normalize_tabular_data import io
+from normalize_tabular_data.io import SCRIPT_SUFFIX
 from normalize_tabular_data.ops import (
     OP_REGISTRY,
+    PLAY_REGISTRY,
     RENAME_OP,
     Operation,
     Pipeline,
@@ -30,11 +35,39 @@ from normalize_tabular_data.screens import (
     OpParamsModal,
     RenameColumnModal,
     SaveModal,
+    ScriptNameModal,
+    ScriptPickerModal,
     SheetPickerModal,
 )
 from normalize_tabular_data.widgets import ColumnSidebar, MenuFooter, StepsBar
 
 PREVIEW_ROWS = 250
+
+
+class CommandMenu(CommandPalette):
+    """The command palette minus its search row: a pure arrow-over/Enter
+    command menu (the search field is hidden in CSS).
+
+    The hidden field keeps the palette internals honest — the list is
+    populated with every command by the mount-time empty gather — but no
+    focus is given to it, so typing does nothing: there is no search.
+    Arrow keys move the highlight through the screen's own 'command_list'
+    actions; Enter runs the highlighted command (the hidden input's
+    Submit gesture replaced by a screen binding)."""
+
+    AUTO_FOCUS = ""
+    """Focus nothing: the (hidden) search input must stay un-focused so
+    keys reach the screen bindings and typing can't re-run the search."""
+    # (None would fall through to App.AUTO_FOCUS "*", which would focus it)
+
+    BINDINGS = [
+        *CommandPalette.BINDINGS,
+        Binding("enter", "accept_highlighted", "", show=False),
+    ]
+
+    def action_accept_highlighted(self) -> None:
+        """Run the highlighted command (menu-pick mode)."""
+        self._select_or_command()
 
 
 class PreviewTable(DataTable):
@@ -169,6 +202,7 @@ class MainScreen(Screen[None]):
     BINDINGS = [
         ("f", "app.open", "(F)ile"),
         ("o", "app.choose_op", "(O)peration"),
+        ("p", "app.play_script", "(P)lay script"),
         ("u", "app.undo", "(U)ndo"),
         ("r", "app.redo", "(R)edo"),
         ("s", "app.save", "(S)ave"),
@@ -192,6 +226,48 @@ class NormalizeApp(App[None]):
     CSS = """
     #preview { border: round $accent; scrollbar-size: 0 0; }
     DataTable { width: 1fr; }
+    /* notification toasts: bottom-left, lifted clear of the panes' bottom
+     * border row (default rack is bottom-right, 1 line up, over the border);
+     * nudged one row and one column inward from the screen corner */
+    ToastRack {
+        align: left bottom;
+        margin-bottom: 2;
+        padding-left: 1;
+    }
+    ToastHolder {
+        align-horizontal: left;
+    }
+    /* infobox itself: a full outline in the severity color (replacing the
+     * default left-hand bar) on a background of its own — the theme accent
+     * at low strength over the theme background, warm against the cool
+     * slate of the panes ($infobox-bg comes from get_theme_variable_defaults) */
+    Toast {
+        background: $infobox-bg;
+        border: round $accent-muted;
+        &:ansi {
+            background: $infobox-bg;
+        }
+    }
+    Toast.-information {
+        border: round $success;
+    }
+    Toast.-warning {
+        border: round $warning;
+    }
+    Toast.-error {
+        border: round $error;
+    }
+    /* command menu (palette minus its search row): centered with 5-space
+    * side margins and 3 rows of air above the drop-down; arrows move the
+    * highlight, Enter runs the highlighted command */
+    CommandPalette #--input {
+        display: none;
+    }
+    CommandPalette > Vertical {
+        margin-top: 3;
+        margin-left: 5;
+        margin-right: 5;
+    }
     """
 
     def __init__(self) -> None:
@@ -199,14 +275,62 @@ class NormalizeApp(App[None]):
         self.path: Path | None = None
         self.pipeline: Pipeline | None = None
         self.analyzed: dict[str, Any] = {}
+        # operations applied since this file was opened: (op key, params);
+        # the raw material for a saved ".ntd" script
+        self.op_log: list[tuple[str, dict[str, Any]]] = []
         # preview sampling seed, redrawn per load so previews are a random
         # sample but stable across refreshes within one load
         self._preview_seed: int = 0
+
+    def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
+        """Palette system commands minus Quit and Screenshot: quitting
+        belongs to the (Q) footer key, and screenshots aren't part of this
+        tool's workflow."""
+        yield from (
+            command
+            for command in super().get_system_commands(screen)
+            if command.title not in ("Quit", "Screenshot")
+        )
+
+    def action_change_theme(self) -> None:
+        """The Theme command (and its keybinding): same no-search menu,
+        over the theme provider instead of the system commands."""
+        from textual.theme import ThemeProvider
+
+        self.push_screen(CommandMenu(id="--theme-picker", providers=[ThemeProvider]))
+
+    def action_command_palette(self) -> None:
+        """Open the command menu: the palette with no search field and a
+        3-row top margin above its drop-down list (CSS below)."""
+        self.push_screen(CommandMenu(id="--command-palette"))
+
+    def get_theme_variable_defaults(self) -> dict[str, str]:
+        """Define $infobox-bg: the theme accent blended at low strength
+        into the theme background — warm against the cool slate of the
+        regular panes, so the infobox reads as its own surface."""
+        variables = super().get_theme_variable_defaults()
+        theme_colors = self.current_theme.to_color_system().generate()
+        background = Color.parse(theme_colors["background"])
+        accent = theme_colors.get("accent")
+        if accent:
+            variables["infobox-bg"] = Color.blend(
+                background, Color.parse(accent), 0.18
+            ).hex
+        else:  # no accent in this theme: a plain lift of the background
+            variables["infobox-bg"] = background.lighten(2).hex
+        return variables
 
     def format_title(self, title: str, sub_title: str) -> Content:
         # centered header slot: file/row info only — the app name lives
         # docked hard right in the header
         return Content(sub_title)
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        # menus that need a loaded table are grayed out in the footer (None)
+        # while there is no file, and their keys do nothing
+        if action in ("play_script", "choose_op", "undo", "redo", "save"):
+            return True if self.pipeline is not None else None
+        return True
 
     @property
     def current_columns(self) -> list[str]:
@@ -252,11 +376,15 @@ class NormalizeApp(App[None]):
             return
         self.path = path
         self.pipeline = Pipeline(source=df)
+        # opening a file starts a fresh operation log for it
+        self.op_log = []
         self._preview_seed = random.getrandbits(64)
         self.analyze_columns()
         self.refresh_preview()
         self.refresh_sidebar()
         self._refresh_steps()
+        # pipeline is now set: re-evaluate the footer's enabled keys
+        self.screen.refresh_bindings()
         self.notify(f"Loaded {path.name} ({df.height:,} rows x {df.width} columns)")
 
     def analyze_columns(self) -> None:
@@ -339,12 +467,89 @@ class NormalizeApp(App[None]):
 
         self.push_screen(OpChooserModal(), handle_result)
 
+    def action_play_script(self) -> None:
+        if self.pipeline is None:
+            self.notify("Open a file first (o)", severity="warning")
+            return
+        # scripts usually live beside the table they were saved from
+        start = self.path.parent if self.path else None
+
+        def handle_result(chosen: Path | None) -> None:
+            if chosen:
+                self.play_script_file(chosen)
+
+        self.push_screen(ScriptPickerModal(start), handle_result)
+
+    def play_script_file(self, script_path: Path) -> None:
+        """Apply a script's steps to the open table, all-or-nothing.
+
+        On the first step that is impossible for the currently loaded file
+        (unknown operation, validation failure, apply error) the alert names
+        the failing step and everything applied from the script so far is
+        rolled back to the state before it started."""
+        try:
+            steps = io.read_script(script_path)
+        except Exception as exc:
+            self.notify(f"Could not read {script_path.name}: {exc}", severity="error")
+            return
+        if not steps:
+            self.notify(
+                f"{script_path.name} contains no operations", severity="warning"
+            )
+            return
+        started_applied = len(self.pipeline.applied)
+        started_log = len(self.op_log)
+        for index, (key, params) in enumerate(steps, 1):
+            op = PLAY_REGISTRY.get(key)
+            if op is None:
+                self._rollback_script(
+                    index,
+                    started_applied,
+                    started_log,
+                    f"Step {index}: {key!r} is not a known operation",
+                )
+                return
+            try:
+                self.pipeline.apply(op, params)
+                # the pipeline refolds lazily; fold now so an op-specific
+                # error (e.g. unparseable dates) rolls back this step too
+                self.pipeline.current()
+            except Exception as exc:
+                self._rollback_script(
+                    index,
+                    started_applied,
+                    started_log,
+                    f"Step {index} of {len(steps)} ({op.title}) failed: {exc}",
+                )
+                return
+            self.op_log.append((key, dict(params)))
+        self.refresh_all()
+        count = len(steps)
+        self.notify(
+            f"Applied {count} step{'s' if count != 1 else ''} from {script_path.name}"
+        )
+
+    def _rollback_script(
+        self, step: int, started_applied: int, started_log: int, reason: str
+    ) -> None:
+        """Undo everything a partially played script applied, then alert."""
+        undid = len(self.pipeline.applied) - started_applied
+        del self.pipeline.applied[started_applied:]
+        self.pipeline.redo_stack.clear()
+        del self.op_log[started_log:]
+        self.refresh_all()
+        detail = (
+            f" — rolled back {undid} step{'s' if undid != 1 else ''}" if undid else ""
+        )
+        self.notify(f"{reason}{detail}", severity="error")
+
     def _apply_now(self, op: Operation, params: dict[str, Any]) -> None:
         try:
             self.pipeline.apply(op, params)
         except ValueError as exc:
             self.notify(str(exc), severity="error")
             return
+        self.op_log.append((op.key, dict(params)))
         self.refresh_all()
         self.notify(f"Applied: {op.title}", severity="information")
 
@@ -384,21 +589,46 @@ class NormalizeApp(App[None]):
             self.notify("Open a file first (o)", severity="warning")
             return
 
-        def handle_result(chosen: tuple[Path, str] | None) -> None:
+        def handle_result(chosen: tuple[Path, str, bool] | None) -> None:
             if not chosen:
                 return
-            target, fmt = chosen
+            target, fmt, want_script = chosen
             try:
                 io.write_table(self.pipeline.current(), target, fmt)
             except Exception as exc:
                 self.notify(f"Save failed: {exc}", severity="error")
                 return
             self.notify(f"Saved {target}")
+            if want_script:
+                self._offer_script_save(target)
 
         suggested = self.path
         if suggested is not None:
             suggested = suggested.with_stem(suggested.stem + "-normalized")
         self.push_screen(SaveModal(suggested), handle_result)
+
+    def _offer_script_save(self, table_path: Path) -> None:
+        suggested = table_path.with_suffix(SCRIPT_SUFFIX).expanduser()
+
+        def handle_result(script_path: Path | None) -> None:
+            if script_path is None:
+                return
+            try:
+                io.write_script(
+                    script_path,
+                    self.op_log,
+                    header_fields={
+                        "source": str(self.path) if self.path else "",
+                        "table": str(table_path),
+                        "saved": _dt.datetime.now().isoformat(timespec="seconds"),
+                    },
+                )
+            except Exception as exc:
+                self.notify(f"Script save failed: {exc}", severity="error")
+                return
+            self.notify(f"Saved script {script_path}")
+
+        self.push_screen(ScriptNameModal(suggested), handle_result)
 
     def action_quit_app(self) -> None:
         self.exit()

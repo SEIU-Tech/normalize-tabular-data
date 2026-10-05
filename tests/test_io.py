@@ -106,3 +106,91 @@ def test_write_unknown_format(tmp_path):
 
     with pytest.raises(ValueError, match="Unknown format"):
         write_table(pl.DataFrame({"a": [1]}), tmp_path / "out.csv", "wacz")
+
+
+def test_script_text_shape():
+    from normalize_tabular_data.io import SCRIPT_SUFFIX, script_text
+
+    assert SCRIPT_SUFFIX == ".ntd"
+    text = script_text(
+        [
+            ("date_normalize", {"column": "Hired Date"}),
+            ("trim_collapse", {"columns": ["Dept", "Name"]}),
+            ("remove_columns", {"columns": ["Zip"]}),
+        ],
+        header_fields={"source": "employees.csv", "saved": "10:22"},
+    )
+    lines = text.strip().split("\n")
+    assert lines[0] == "# normalize-tabular-data script"
+    assert lines[1] == "# employees.csv"
+    assert lines[2] == "# 10:22"
+    assert lines[3] == 'date_normalize(column="Hired Date")'
+    assert lines[4] == 'trim_collapse(columns=["Dept", "Name"])'
+    assert lines[5] == 'remove_columns(columns=["Zip"])'
+    # plain ASCII, newline-terminated
+    text.encode("ascii")
+    assert text.endswith("\n")
+
+
+def test_write_script_ascii(tmp_path):
+    from normalize_tabular_data.io import write_script
+
+    out = tmp_path / "ops.ntd"
+    write_script(
+        out,
+        [("trim_collapse", {"columns": ["a"]})],
+        header_fields={"source": "café.csv"},
+    )
+    # header field with a non-ASCII source name still writes as ASCII
+    body = out.read_text(encoding="ascii")
+    assert 'trim_collapse(columns=["a"])' in body
+
+
+def test_parse_script_line_round_trips_saved_steps():
+    """Saved script lines parse back to exactly the (key, params) steps."""
+    from normalize_tabular_data.io import parse_script_line, script_text
+
+    steps = [
+        ("trim_collapse", {"columns": ["Dept", 'Weird "name"']}),
+        ("date_normalize", {"column": "Hired Date"}),
+        ("split_column", {"column": "Notes", "delimiter": "", "max_parts": 0}),
+        ("dedup_rows", {"columns": [], "keep": "first"}),
+        ("fill_nulls", {"columns": ["a"], "value": "x, y"}),
+    ]
+    for key, params in steps:
+        line = script_text([(key, params)], {}).splitlines()[-1]
+        assert parse_script_line(line) == (key, params)
+
+
+def test_read_script_skips_comments_and_blank_lines(tmp_path):
+    from normalize_tabular_data.io import read_script
+
+    script = tmp_path / "s.ntd"
+    script.write_text(
+        "# normalize-tabular-data script\n"
+        "# source: employees.csv\n"
+        "\n"
+        '   trim_collapse(columns=["Dept"])   \n'
+        'date_normalize(column = "Hired Date")\n',
+        encoding="ascii",
+    )
+    assert read_script(script) == [
+        ("trim_collapse", {"columns": ["Dept"]}),
+        ("date_normalize", {"column": "Hired Date"}),
+    ]
+
+
+def test_read_script_bad_line_names_the_line(tmp_path):
+    from normalize_tabular_data.io import read_script
+
+    script = tmp_path / "s.ntd"
+    script.write_text('# hi\ntrim_collapse(columns=["a"])\nfrobnicate(x\n')
+    with pytest.raises(ValueError, match="line 3.*not an operation line"):
+        read_script(script)
+
+
+def test_play_script_line_rejects_non_json_values():
+    from normalize_tabular_data.io import parse_script_line
+
+    with pytest.raises(ValueError, match="bad value for 'value'"):
+        parse_script_line('fill_nulls(columns=["A"], value=starts_or_not)')

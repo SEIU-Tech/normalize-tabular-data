@@ -1,0 +1,8 @@
+# normalize-tabular-data script
+# 2026-10-05T10:31:25
+date_normalize(column="Signed Up")
+trim_collapse(columns=["Full Name", "Worksite", "Job Class"])
+split_column(column="Full Name", delimiter="")
+rename_single(column="Full Name_1", new_name="First Name")
+rename_single(column="Full Name_2", new_name="Last Name")
+

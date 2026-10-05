@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from rich.syntax import Syntax as RichSyntax
 from textual import on
+from textual.color import Color
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
@@ -20,7 +22,7 @@ from textual.widgets import (
     Static,
 )
 
-from normalize_tabular_data.io import WRITE_SUFFIXES
+from normalize_tabular_data.io import SCRIPT_SUFFIX, WRITE_SUFFIXES
 from normalize_tabular_data.ops import Operation
 
 
@@ -131,6 +133,128 @@ class OpenFileModal(ModalDialog):
         raw = self.query_one("#path_input", Input).value.strip()
         if raw:
             self.post_result(Path(raw).expanduser())
+
+
+class ScriptPickerModal(OpenFileModal):
+    """Browse for an operation script file to play against the open table.
+
+    As the browse list highlight moves (or a path is typed), a syntax-
+    highlighted preview of the `.ntd` file shows underneath."""
+
+    dialog_title = "Play script"
+
+    DEFAULT_CSS = """
+    ScriptPickerModal > Vertical > Static#script_preview {
+        height: 10;
+        width: 64;
+        margin-top: 1;
+        background: $boost;
+    }
+    """
+
+    PREVIEW_LINES = 40
+
+    preview_text: str = ""
+    preview_background: str = "#272727"
+
+    def compose_body(self) -> ComposeResult:
+        yield Input(placeholder="type a path, then press Enter", id="path_input")
+        yield ListView(id="opendir")
+        self.preview = Static(
+            RichSyntax("", lexer="python", background_color=self._preview_background()),
+            id="script_preview",
+        )
+        yield self.preview
+
+    def on_mount(self) -> None:
+        self._refresh_dir(self.dir)
+        # browse-first dialog: arrows move the highlight (and the preview),
+        # Enter on a file plays it, OK confirms the current selection —
+        # the list takes focus after the screen's default focus pass
+        self.call_after_refresh(self.query_one("#opendir", ListView).focus)
+
+    def _current_choice(self) -> Path | None:
+        """The script the dialog would play right now: a typed path that
+        exists, else the currently highlighted list entry (file paths
+        only — directories are browsed, not played)."""
+        raw = self.query_one("#path_input", Input).value.strip()
+        if raw and Path(raw).expanduser().is_file():
+            return Path(raw).expanduser()
+        child = self.query_one("#opendir", ListView).highlighted_child
+        if child is not None and child.name:
+            chosen = Path(child.name)
+            if chosen.is_file():
+                return chosen
+        return None
+
+    def action_ok(self) -> None:
+        chosen = self._current_choice()
+        if chosen is None:
+            self.app.notify(
+                "Select a script file first (arrow keys highlight, Enter plays)",
+                severity="warning",
+            )
+            return
+        self.post_result(chosen)
+
+    def _update_preview(self, target: Path) -> None:
+        self.preview_text = self._script_text(target)
+        self.preview.update(
+            RichSyntax(
+                self.preview_text,
+                lexer="python",
+                background_color=self.preview_background,
+            )
+        )
+
+    def _preview_background(self) -> str:
+        """Hex color the preview strip paints behind the highlighted text.
+
+        The strip's CSS is `$boost` over the dialog's `$surface`; rich's
+        'default' background would leave those cells to the terminal's own
+        background color, which is not the box color. Composite the same
+        colors the compositor uses, and paint the text cells with the
+        result — foreground (monokai) colors are untouched."""
+        variables = self.app.get_css_variables()
+        boost = Color.parse(variables["boost"])
+        surface = Color.parse(variables["surface"])
+        alpha = boost.a  # Color.a is already a 0..1 float
+        channels = tuple(
+            round(channel * alpha + base * (1 - alpha))
+            for channel, base in zip(boost.rgb, surface.rgb)
+        )
+        hex = f"#{channels[0]:02X}{channels[1]:02X}{channels[2]:02X}"
+        self.preview_background = hex
+        return hex
+
+    def _script_text(self, target: Path) -> str:
+        """The script file's text (capped), or '' when target is not one."""
+        try:
+            if target.is_file() and target.suffix.lower() == SCRIPT_SUFFIX:
+                lines = target.read_text(
+                    encoding="utf-8", errors="replace"
+                ).splitlines()
+                head, note = lines[: self.PREVIEW_LINES], ""
+                if len(lines) > self.PREVIEW_LINES:
+                    note = f"\n# … {len(lines) - self.PREVIEW_LINES} more lines"
+                return "\n".join(head) + note
+        except OSError:
+            pass
+        return ""
+
+    @on(ListView.Highlighted, "#opendir")
+    def _preview_highlighted(self, event: ListView.Highlighted) -> None:
+        """As highlight moves through the listing, preview highlighted file."""
+        if event.item and event.item.name:
+            target = Path(event.item.name)
+            if target.is_file():
+                self._update_preview(target)
+
+    @on(Input.Changed, "#path_input")
+    def _preview_typed(self, event: Input.Changed) -> None:
+        raw = event.value.strip()
+        if raw:
+            self._update_preview(Path(raw).expanduser())
 
 
 class RenameColumnModal(ModalDialog):
@@ -368,10 +492,14 @@ class SaveModal(ModalDialog):
         self.overwrite = Checkbox(
             "Allow overwrite if file exists", False, id="allow_overwrite"
         )
+        self.save_script = Checkbox(
+            "Save sequence of operations?", False, id="save_script"
+        )
         extensions = " ".join(sorted(WRITE_SUFFIXES))
         yield self.path_input
         yield Static(f"Extensions: {extensions}", classes="help")
         yield self.overwrite
+        yield self.save_script
 
     def action_ok(self) -> None:
         raw = self.path_input.value.strip()
@@ -393,8 +521,48 @@ class SaveModal(ModalDialog):
                 severity="warning",
             )
             return
-        self.post_result((target, fmt))
+        self.post_result((target, fmt, self.save_script.value is True))
 
     @on(Input.Submitted, "#save_input")
     def _save_input_submit(self) -> None:
+        self.action_ok()
+
+
+class ScriptNameModal(ModalDialog):
+    """Name the '.ntd' script file when saving a sequence of operations.
+
+    The default carries the .ntd extension; typing a different one saves
+    under that extension instead."""
+
+    dialog_title = "Save script"
+
+    def __init__(self, suggested: Path) -> None:
+        super().__init__()
+        self.suggested = suggested
+
+    def compose_body(self) -> ComposeResult:
+        self.path_input = Input(
+            placeholder=str(self.suggested),
+            value=str(self.suggested),
+            id="script_input",
+        )
+        yield self.path_input
+        yield Static(
+            f"Default extension: {SCRIPT_SUFFIX} — type another to override",
+            classes="help",
+        )
+
+    def action_ok(self) -> None:
+        raw = self.path_input.value.strip()
+        if not raw:
+            self.app.notify("Type a script file name or path", severity="error")
+            return
+        target = Path(raw).expanduser()
+        if target.exists():
+            self.app.notify("Script file exists: pick another name", severity="warning")
+            return
+        self.post_result(target)
+
+    @on(Input.Submitted, "#script_input")
+    def _script_input_submit(self) -> None:
         self.action_ok()

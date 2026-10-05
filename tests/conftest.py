@@ -19,7 +19,7 @@ def sample_data_dir() -> Path:
 @pytest.fixture
 def large_csv_path() -> Path:
     """Second committed sample: 100 rows, different schema (worksite data)."""
-    return DATA_DIR / "large_worksite.csv"
+    return DATA_DIR / "worksite.csv"
 
 
 SAMPLE_DATA = {
