@@ -40,15 +40,15 @@ uv run normalize-tabular-data
 
 Launch with `normalize-tabular-data`. Keys:
 
-| Key | Action                      |
-|-----|-----------------------------|
-| `f` | (F)ile — open a file        |
-| `o` | (O)peration — choose an op  |
-| `p` | (P)lay script — reapply a saved `.ntd` sequence |
-| `u` | (U)ndo last applied step    |
-| `r` | (R)edo                      |
-| `s` | (S)ave the data in a format |
-| `q` | (Q)uit                      |
+| Key | Action                       |
+|-----|------------------------------|
+| `f` | (F)ile — open a file         |
+| `o` | (O)peration — choose an op   |
+| `p` | (P)lay script — apply `.ntd` |
+| `u` | (U)ndo last applied step     |
+| `r` | (R)edo                       |
+| `s` | (S)ave the data in a format  |
+| `q` | (Q)uit                       |
 
 ## Operations
 
@@ -99,7 +99,7 @@ renames, trims or splits is missing, the operation is unknown — playing
 stops with an alert naming the failing step, and every step the script had
 already applied is rolled back, so the table is left exactly as it was.
 
-![TUI preview](docs/screenshot.png)
+![TUI preview](https://raw.githubusercontent.com/SEIU-Tech/normalize-tabular-data/main/docs/screenshot.png)
 
 ## Publishing
 
