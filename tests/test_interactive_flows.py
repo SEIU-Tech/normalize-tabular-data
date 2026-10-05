@@ -518,3 +518,100 @@ async def test_left_right_scroll_by_whole_column(large_csv_path):
         await pilot.press("left")
         await pilot.pause()
         assert table.scroll_x == 0.0
+
+
+async def test_save_with_script_dialog(csv_path, tmp_path):
+    """Ticking 'Save sequence of operations?' opens the script naming dialog;
+    the script lands at the suggested .ntd path with one line per applied op.
+    Unticked (the default) saves only the table."""
+    from textual.widgets import Label
+
+    app = NormalizeApp()
+    async with app.run_test() as pilot:
+        app.load_path(csv_path)
+        await pilot.pause()
+        # apply one operation so the log has content
+        from normalize_tabular_data.ops import OP_REGISTRY
+
+        app._apply_now(OP_REGISTRY["trim_collapse"], {"columns": ["Notes"]})
+        # a header-click rename also lands in the log
+        from textual.widgets import DataTable
+
+        table = app.screen.query_one("#preview", DataTable)
+        dept = list(table.columns.values())[2]
+        app.post_message(DataTable.HeaderSelected(table, dept.key, 2, dept.label))
+        await pilot.pause()
+        app.screen.name_input.value = "dept_code"
+        app.screen.action_ok()
+        await pilot.pause()
+
+        # save with the script box ticked
+        table_out = tmp_path / "out.csv"
+        await pilot.press("s")
+        await pilot.pause()
+        modal = app.screen
+        assert modal.__class__.__name__ == "SaveModal"
+        assert modal.save_script.value is False  # default unchecked
+        modal.path_input.value = str(table_out)
+        modal.save_script.value = True
+        modal.action_ok()
+        await pilot.pause()
+
+        # second dialog asks for the script name, suggested .ntd
+        script_modal = app.screen
+        assert script_modal.__class__.__name__ == "ScriptNameModal"
+        help_texts = [
+            *(l.visual.plain for l in script_modal.query(Label)),
+            *(s.visual.plain for s in script_modal.query("Static.help")),
+        ]
+        assert any(".ntd" in t for t in help_texts)  # help mentions the ext
+        suggested = script_modal.path_input.value
+        assert suggested == str(tmp_path / "out.ntd")
+        script_modal.action_ok()
+        await pilot.pause()
+
+        assert table_out.exists()
+        script_path = tmp_path / "out.ntd"
+        assert script_path.exists()
+        lines = script_path.read_text().strip().split("\n")
+        assert lines[0] == "# normalize-tabular-data script"
+        assert f'bootstrap(table="{table_out}")' not in "".join(lines)
+        op_lines = [l for l in lines if l and not l.startswith("#")]
+        assert op_lines == [
+            'trim_collapse(columns=["Notes"])',
+            'rename_single(column="Dept", new_name="dept_code")',
+        ]
+
+        # extension override: save again under a different suffix
+        table_out2 = tmp_path / "out2.csv"
+        app.load_path(csv_path)
+        await pilot.pause()
+        await pilot.press("s")
+        await pilot.pause()
+        modal = app.screen
+        modal.path_input.value = str(table_out2)
+        modal.save_script.value = True
+        modal.action_ok()
+        await pilot.pause()
+        script_modal = app.screen
+        script_modal.path_input.value = str(tmp_path / "renamed-seq.custom")
+        script_modal.action_ok()
+        await pilot.pause()
+        assert (tmp_path / "renamed-seq.custom").exists()
+
+
+async def test_save_without_script_no_dialog(csv_path, tmp_path):
+    """Unchecked (default): no second dialog, no script file."""
+    app = NormalizeApp()
+    async with app.run_test() as pilot:
+        app.load_path(csv_path)
+        await pilot.pause()
+        await pilot.press("s")
+        await pilot.pause()
+        modal = app.screen
+        modal.path_input.value = str(tmp_path / "plain.csv")
+        modal.action_ok()
+        await pilot.pause()
+        assert app.screen.__class__.__name__ != "ScriptNameModal"
+        assert (tmp_path / "plain.csv").exists()
+        assert not (tmp_path / "plain.ntd").exists()

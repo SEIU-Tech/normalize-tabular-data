@@ -106,3 +106,41 @@ def test_write_unknown_format(tmp_path):
 
     with pytest.raises(ValueError, match="Unknown format"):
         write_table(pl.DataFrame({"a": [1]}), tmp_path / "out.csv", "wacz")
+
+
+def test_script_text_shape():
+    from normalize_tabular_data.io import SCRIPT_SUFFIX, script_text
+
+    assert SCRIPT_SUFFIX == ".ntd"
+    text = script_text(
+        [
+            ("date_normalize", {"column": "Hired Date"}),
+            ("trim_collapse", {"columns": ["Dept", "Name"]}),
+            ("remove_columns", {"columns": ["Zip"]}),
+        ],
+        header_fields={"source": "employees.csv", "saved": "10:22"},
+    )
+    lines = text.strip().split("\n")
+    assert lines[0] == "# normalize-tabular-data script"
+    assert lines[1] == "# employees.csv"
+    assert lines[2] == "# 10:22"
+    assert lines[3] == 'date_normalize(column="Hired Date")'
+    assert lines[4] == 'trim_collapse(columns=["Dept", "Name"])'
+    assert lines[5] == 'remove_columns(columns=["Zip"])'
+    # plain ASCII, newline-terminated
+    text.encode("ascii")
+    assert text.endswith("\n")
+
+
+def test_write_script_ascii(tmp_path):
+    from normalize_tabular_data.io import write_script
+
+    out = tmp_path / "ops.ntd"
+    write_script(
+        out,
+        [("trim_collapse", {"columns": ["a"]})],
+        header_fields={"source": "café.csv"},
+    )
+    # header field with a non-ASCII source name still writes as ASCII
+    body = out.read_text(encoding="ascii")
+    assert 'trim_collapse(columns=["a"])' in body

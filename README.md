@@ -52,6 +52,24 @@ Writes: CSV, TSV, JSON lines, Parquet, Excel (`.xlsx`).
 Large files are previewed with a random sample of 250 rows; every operation
 still runs on the full data.
 
+## Operation scripts (`.ntd`)
+
+Every open file keeps an internal log of the operations performed on it. When
+saving, the dialog offers a **Save sequence of operations?** checkbox
+(unticked by default); with it ticked, a second dialog asks where to write
+the script — suggested `<table>.ntd`, any other extension you type is kept.
+
+The script is plain ASCII text, one operation per line, e.g.:
+
+```
+# normalize-tabular-data script
+# source: employees.csv
+# table: /data/employees-normalized.csv
+# saved: 2026-10-05T12:30:11
+trim_collapse(columns=["Dept", "Name"])
+date_normalize(column="Hired Date")
+```
+
 ![TUI preview](docs/screenshot.png)
 
 ## License

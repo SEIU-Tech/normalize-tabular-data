@@ -17,6 +17,7 @@ from textual.screen import Screen
 from textual.widgets import DataTable, Header, Label, ListItem, ListView
 
 from normalize_tabular_data import io
+from normalize_tabular_data.io import SCRIPT_SUFFIX
 from normalize_tabular_data.ops import (
     OP_REGISTRY,
     RENAME_OP,
@@ -30,6 +31,7 @@ from normalize_tabular_data.screens import (
     OpParamsModal,
     RenameColumnModal,
     SaveModal,
+    ScriptNameModal,
     SheetPickerModal,
 )
 from normalize_tabular_data.widgets import ColumnSidebar, MenuFooter, StepsBar
@@ -199,6 +201,9 @@ class NormalizeApp(App[None]):
         self.path: Path | None = None
         self.pipeline: Pipeline | None = None
         self.analyzed: dict[str, Any] = {}
+        # operations applied since this file was opened: (op key, params);
+        # the raw material for a saved ".ntd" script
+        self.op_log: list[tuple[str, dict[str, Any]]] = []
         # preview sampling seed, redrawn per load so previews are a random
         # sample but stable across refreshes within one load
         self._preview_seed: int = 0
@@ -252,6 +257,8 @@ class NormalizeApp(App[None]):
             return
         self.path = path
         self.pipeline = Pipeline(source=df)
+        # opening a file starts a fresh operation log for it
+        self.op_log = []
         self._preview_seed = random.getrandbits(64)
         self.analyze_columns()
         self.refresh_preview()
@@ -345,6 +352,7 @@ class NormalizeApp(App[None]):
         except ValueError as exc:
             self.notify(str(exc), severity="error")
             return
+        self.op_log.append((op.key, dict(params)))
         self.refresh_all()
         self.notify(f"Applied: {op.title}", severity="information")
 
@@ -384,21 +392,46 @@ class NormalizeApp(App[None]):
             self.notify("Open a file first (o)", severity="warning")
             return
 
-        def handle_result(chosen: tuple[Path, str] | None) -> None:
+        def handle_result(chosen: tuple[Path, str, bool] | None) -> None:
             if not chosen:
                 return
-            target, fmt = chosen
+            target, fmt, want_script = chosen
             try:
                 io.write_table(self.pipeline.current(), target, fmt)
             except Exception as exc:
                 self.notify(f"Save failed: {exc}", severity="error")
                 return
             self.notify(f"Saved {target}")
+            if want_script:
+                self._offer_script_save(target)
 
         suggested = self.path
         if suggested is not None:
             suggested = suggested.with_stem(suggested.stem + "-normalized")
         self.push_screen(SaveModal(suggested), handle_result)
+
+    def _offer_script_save(self, table_path: Path) -> None:
+        suggested = table_path.with_suffix(SCRIPT_SUFFIX).expanduser()
+
+        def handle_result(script_path: Path | None) -> None:
+            if script_path is None:
+                return
+            try:
+                io.write_script(
+                    script_path,
+                    self.op_log,
+                    header_fields={
+                        "source": str(self.path) if self.path else "",
+                        "table": str(table_path),
+                        "saved": _dt.datetime.now().isoformat(timespec="seconds"),
+                    },
+                )
+            except Exception as exc:
+                self.notify(f"Script save failed: {exc}", severity="error")
+                return
+            self.notify(f"Saved script {script_path}")
+
+        self.push_screen(ScriptNameModal(suggested), handle_result)
 
     def action_quit_app(self) -> None:
         self.exit()

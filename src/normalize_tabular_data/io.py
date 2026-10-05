@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import polars as pl
@@ -95,3 +96,37 @@ def write_table(
         df.write_excel(path, worksheet=sheet_name, autofit=True, freeze_panes="B2")
     else:
         raise ValueError(f"Unknown format {fmt!r}")
+
+
+# --- operation scripts --------------------------------------------------------
+
+SCRIPT_SUFFIX = ".ntd"
+
+
+def script_text(steps: list[tuple[str, dict]], header_fields: dict[str, str]) -> str:
+    """Human-readable ASCII text, one operation description per line.
+
+    Every operation is `<key>(<param>=<json value>, ...)` so the lines stay
+    readable while remaining mechanically parseable for a future
+    "apply a script" capability. `header_fields` become leading `#`
+    comment lines (source file, save time, ...)"""
+    lines = ["# normalize-tabular-data script"]
+    lines += [f"# {text}" for text in header_fields.values() if text]
+    lines += [
+        f"{key}("
+        + ", ".join(f"{param}={json.dumps(value)}" for param, value in params.items())
+        + ")"
+        for key, params in steps
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def write_script(
+    path: Path,
+    steps: list[tuple[str, dict]],
+    header_fields: dict[str, str],
+) -> None:
+    """Write the script as plain ASCII (non-ASCII input becomes '?')."""
+    path.write_text(
+        script_text(steps, header_fields), encoding="ascii", errors="replace"
+    )

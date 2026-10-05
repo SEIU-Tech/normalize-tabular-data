@@ -20,7 +20,7 @@ from textual.widgets import (
     Static,
 )
 
-from normalize_tabular_data.io import WRITE_SUFFIXES
+from normalize_tabular_data.io import SCRIPT_SUFFIX, WRITE_SUFFIXES
 from normalize_tabular_data.ops import Operation
 
 
@@ -368,10 +368,14 @@ class SaveModal(ModalDialog):
         self.overwrite = Checkbox(
             "Allow overwrite if file exists", False, id="allow_overwrite"
         )
+        self.save_script = Checkbox(
+            "Save sequence of operations?", False, id="save_script"
+        )
         extensions = " ".join(sorted(WRITE_SUFFIXES))
         yield self.path_input
         yield Static(f"Extensions: {extensions}", classes="help")
         yield self.overwrite
+        yield self.save_script
 
     def action_ok(self) -> None:
         raw = self.path_input.value.strip()
@@ -393,8 +397,48 @@ class SaveModal(ModalDialog):
                 severity="warning",
             )
             return
-        self.post_result((target, fmt))
+        self.post_result((target, fmt, self.save_script.value is True))
 
     @on(Input.Submitted, "#save_input")
     def _save_input_submit(self) -> None:
+        self.action_ok()
+
+
+class ScriptNameModal(ModalDialog):
+    """Name the '.ntd' script file when saving a sequence of operations.
+
+    The default carries the .ntd extension; typing a different one saves
+    under that extension instead."""
+
+    dialog_title = "Save script"
+
+    def __init__(self, suggested: Path) -> None:
+        super().__init__()
+        self.suggested = suggested
+
+    def compose_body(self) -> ComposeResult:
+        self.path_input = Input(
+            placeholder=str(self.suggested),
+            value=str(self.suggested),
+            id="script_input",
+        )
+        yield self.path_input
+        yield Static(
+            f"Default extension: {SCRIPT_SUFFIX} — type another to override",
+            classes="help",
+        )
+
+    def action_ok(self) -> None:
+        raw = self.path_input.value.strip()
+        if not raw:
+            self.app.notify("Type a script file name or path", severity="error")
+            return
+        target = Path(raw).expanduser()
+        if target.exists():
+            self.app.notify("Script file exists: pick another name", severity="warning")
+            return
+        self.post_result(target)
+
+    @on(Input.Submitted, "#script_input")
+    def _script_input_submit(self) -> None:
         self.action_ok()
