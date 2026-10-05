@@ -41,12 +41,14 @@ async def test_open_via_keys_and_apply_dates_via_keys(csv_path):
         app.screen.action_ok()
         await pilot.pause()
         current = app.pipeline.current()
-        assert current["Hired Date"].dtype == pl.Datetime("ns")
+        assert current["Hired Date"].to_list()[0] == "2022-03-22T00:00:00"
+        assert current["Hired Date"].dtype == pl.String
         assert not hasattr(app, "pending")  # removed two-step flow
 
         # u: undo restores the original data
         await pilot.press("u")
         assert app.pipeline.current()["Hired Date"].dtype == pl.String
+        assert app.pipeline.current()["Hired Date"].to_list()[0] == "2022-03-22"
 
 
 async def test_escape_cancels_open_modal(csv_path):
@@ -739,7 +741,8 @@ async def test_play_script_applies_steps_to_open_file(csv_path, tmp_path):
         await pilot.pause()
         current = app.pipeline.current()
         assert current["Dept"][0] == "Engineering"  # was "  Engineering "
-        assert current["Hired Date"].dtype == pl.Datetime("ns")
+        assert current["Hired Date"].dtype == pl.String
+        assert current["Hired Date"][0] == "2022-03-22T00:00:00"
         # steps recorded in the operation log exactly as written
         assert app.op_log == steps
 
@@ -800,7 +803,8 @@ async def test_play_committed_worksite_script(large_csv_path):
             "First Name",
             "Last Name",
         ]
-        assert current["Signed Up"].dtype == pl.Datetime("ns")  # empty -> null
+        assert current["Signed Up"].dtype == pl.String  # empty -> null
+        assert current["Signed Up"].to_list()[0] == "2020-12-12T00:00:00"
         # the split tokens: first row "Quinn Huang" -> two non-null parts
         assert current["First Name"][0] == "Quinn"
         assert current["Last Name"][0] == "Huang"
@@ -1027,3 +1031,96 @@ async def test_command_menu_searches_nothing_and_is_positioned():
         for _ in range(8):
             await pilot.pause(0.25)
         assert not CommandPalette.is_open(app)
+
+
+async def test_initial_file_command_line(sample_csv_path):
+    """NormalizeApp(initial_file=...) loads the table at startup — the
+    optional FILE given on the command line."""
+    from textual.widgets import DataTable
+
+    app = NormalizeApp(initial_file=sample_csv_path)
+    async with app.run_test() as pilot:
+        for _ in range(4):
+            await pilot.pause(0.25)
+        await pilot.pause()
+        assert app.pipeline is not None
+        assert app.path == sample_csv_path
+        table = app.screen.query_one(DataTable)
+        assert table.row_count == app.pipeline.current().height
+        # footer menus enabled right away (no manual open needed)
+        assert app.check_action("choose_op", ()) is True
+
+
+async def test_initial_file_missing_stays_graceful(tmp_path):
+    """A command-line file that cannot be read alerts instead of crashing
+    the TUI, which remains on the main screen with nothing loaded."""
+    from textual.widgets import DataTable
+
+    app = NormalizeApp(initial_file=tmp_path / "nonexistent.csv")
+    async with app.run_test() as pilot:
+        for _ in range(4):
+            await pilot.pause(0.25)
+        assert app.pipeline is None
+        assert app.screen.query_one(DataTable).row_count == 0
+        # still fully usable: the open dialog comes up
+        await pilot.press("f")
+        await pilot.pause()
+        assert app.screen.__class__.__name__ == "OpenFileModal"
+
+
+async def test_initial_script_plays_after_load(tmp_path, csv_path):
+    """With --script named on the command line, the .ntd file is played on
+    the auto-opened table right away — the steps act as if the user had
+    pressed P and picked the script."""
+    from textual.widgets import DataTable
+
+    script = tmp_path / "tidy.ntd"
+    script.write_text(
+        "# normalize-tabular-data script\n"
+        'trim_collapse(columns=["Dept", "Notes"])\n'
+        'date_normalize(column="Hired Date")\n'
+    )
+    app = NormalizeApp(initial_file=csv_path, initial_script=script)
+    async with app.run_test() as pilot:
+        for _ in range(5):
+            await pilot.pause(0.25)
+        await pilot.pause()
+        current = app.pipeline.current()
+        assert current["Dept"].to_list()[0] == "Engineering"  # was "  Engineering "
+        assert current["Hired Date"].dtype == pl.String
+        assert current["Hired Date"].to_list()[0] == "2022-03-22T00:00:00"
+        # both steps landed in the op log, in play order
+        assert app.op_log == [
+            ("trim_collapse", {"columns": ["Dept", "Notes"]}),
+            ("date_normalize", {"column": "Hired Date"}),
+        ]
+        assert app.screen.query_one(DataTable).row_count == 4
+
+
+async def test_initial_script_failure_rolls_back_gracefully(tmp_path, csv_path):
+    """A command-line script whose steps cannot run against the file alerts
+    and rolls back — the loaded table is untouched, the TUI stays on it."""
+    from textual.widgets import DataTable
+
+    script = tmp_path / "broken.ntd"
+    script.write_text(
+        'trim_collapse(columns=["Dept"])\n'
+        'trim_collapse(columns=["No Such Column"])\n'
+        'rename_single(column="Dept", new_name="Department")\n'
+    )
+    app = NormalizeApp(initial_file=csv_path, initial_script=script)
+    async with app.run_test() as pilot:
+        for _ in range(5):
+            await pilot.pause(0.25)
+        await pilot.pause()
+        # step 2 is impossible: both steps rolled back, log untouched
+        assert app.op_log == []
+        assert app.pipeline.applied == []
+        assert app.pipeline.current()["Dept"].to_list()[0] == "  Engineering "
+        # everything still works: undo is a no-op, the dialog opens
+        await pilot.press("u")
+        await pilot.pause()
+        assert app.screen.query_one(DataTable).row_count == 4
+        await pilot.press("o")
+        await pilot.pause()
+        assert app.screen.__class__.__name__ == "OpChooserModal"

@@ -32,10 +32,14 @@ async def test_apply_date_op_through_pipeline(csv_path):
         app.pipeline.apply(OP_REGISTRY["date_normalize"], {"column": "Hired Date"})
         app.refresh_all()
         await pilot.pause()
-        assert app.pipeline.current()["Hired Date"].dtype == pl.Datetime("ns")
-        # undo restores String dtype
+        assert app.pipeline.current()["Hired Date"].dtype == pl.String
+        assert (
+            app.pipeline.current()["Hired Date"].to_list()[0].startswith("2022-03-22T")
+        )
+        # undo restores the raw strings
         app.action_undo()
         assert app.pipeline.current()["Hired Date"].dtype == pl.String
+        assert app.pipeline.current()["Hired Date"].to_list()[0] == "2022-03-22"
 
 
 async def test_provided_csv_sample(csv_path):

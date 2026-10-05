@@ -18,12 +18,20 @@ def test_date_normalize():
         pl.DataFrame({"d": ["2022-03-22", "Mar 1, 2019", "garbage", None]}),
         {"column": "d"},
     )
-    iso = [
-        dt.strftime("%Y-%m-%dT%H:%M:%S") if dt is not None else None
-        for dt in df["d"].to_list()
+    # normalized dates are canonical UTC at second resolution: no
+    # sub-second digits anywhere in the saved data
+    assert df["d"].to_list() == [
+        "2022-03-22T00:00:00",
+        "2019-03-01T00:00:00",
+        None,
+        None,
     ]
-    assert iso == ["2022-03-22T00:00:00", "2019-03-01T00:00:00", None, None]
-    assert df["d"].dtype == pl.Datetime("ns")
+    assert df["d"].dtype == pl.String
+    # even a fractioned input truncates to seconds
+    fract = op.apply(
+        pl.DataFrame({"d": ["2022-03-22T10:15:59.673918"]}), {"column": "d"}
+    )
+    assert fract["d"].to_list() == ["2022-03-22T10:15:59"]
 
 
 def test_trim_collapse():
@@ -97,11 +105,7 @@ def test_pipeline_recompute_and_undo_redo(sample_df):
     )
     cur = pipe.current()
     assert "Ops  " not in " ".join(cur["Dept"].to_list())
-    iso = [
-        dt.strftime("%Y-%m-%d") if dt is not None else None
-        for dt in cur["Hired Date"].to_list()
-    ]
-    assert iso[0] == "2022-03-22"
+    assert cur["Hired Date"][0].startswith("2022-03-22")
 
     # undo: back to trimmed state (Hired Date still raw strings)
     assert pipe.undo()
@@ -112,7 +116,8 @@ def test_pipeline_recompute_and_undo_redo(sample_df):
 
     assert pipe.redo() and pipe.redo()  # re-apply both steps
     cur = pipe.current()
-    assert cur["Hired Date"].dtype == pl.Datetime("ns")
+    assert cur["Hired Date"].dtype == pl.String
+    assert cur["Hired Date"][0] == "2022-03-22T00:00:00"
     assert len(pipe.step_summary()) == 2
 
 
@@ -123,7 +128,8 @@ def test_pipeline_applies_recompute_from_source(sample_df):
     # recompute folds all steps from the original source
     cur = pipe.current()
     assert cur["Notes"].to_list() == ["", "", "Alice Doe", ""]
-    assert cur["Hired Date"].dtype == pl.Datetime("ns")
+    assert cur["Hired Date"].dtype == pl.String
+    assert cur["Hired Date"].to_list()[0] == "2022-03-22T00:00:00"
 
 
 def test_analyze_column_flags_date_candidate():
