@@ -10,6 +10,8 @@ Load a file, see a preview, build up a pipeline of normalization operations
 combine/split columns, drop columns), then save the
 cleaned result.
 
+![TUI preview](https://raw.githubusercontent.com/SEIU-Tech/normalize-tabular-data/main/docs/screenshot.png)
+
 ## Running
 
 ### Persistent install
@@ -146,13 +148,12 @@ rename_single(column="Full Name_2", new_name="Last Name")
 
 Press `p` (available while a file is loaded) to pick a script file: the
 dialog previews the highlighted `.ntd` file (syntax-highlighted, first 40
-lines) before you confirm. Its operations are applied, in order, to the table you have open. If any step
-cannot be performed against the currently loaded file — a column it
-renames, trims or splits is missing, the operation is unknown — playing
-stops with an alert naming the failing step, and every step the script had
-already applied is rolled back, so the table is left exactly as it was.
-
-![TUI preview](https://raw.githubusercontent.com/SEIU-Tech/normalize-tabular-data/main/docs/screenshot.png)
+lines) before you confirm. Its operations are applied, in order, to the table 
+you have open. If any step cannot be performed against the currently loaded 
+file — a column it renames, trims or splits is missing, the operation is 
+unknown — playing stops with an alert naming the failing step, and every step
+the script had already applied is rolled back, so the table is left exactly as 
+it was.
 
 ## Publishing
 
