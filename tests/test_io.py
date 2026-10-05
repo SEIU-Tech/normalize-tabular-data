@@ -144,3 +144,53 @@ def test_write_script_ascii(tmp_path):
     # header field with a non-ASCII source name still writes as ASCII
     body = out.read_text(encoding="ascii")
     assert 'trim_collapse(columns=["a"])' in body
+
+
+def test_parse_script_line_round_trips_saved_steps():
+    """Saved script lines parse back to exactly the (key, params) steps."""
+    from normalize_tabular_data.io import parse_script_line, script_text
+
+    steps = [
+        ("trim_collapse", {"columns": ["Dept", 'Weird "name"']}),
+        ("date_normalize", {"column": "Hired Date"}),
+        ("split_column", {"column": "Notes", "delimiter": "", "max_parts": 0}),
+        ("dedup_rows", {"columns": [], "keep": "first"}),
+        ("fill_nulls", {"columns": ["a"], "value": "x, y"}),
+    ]
+    for key, params in steps:
+        line = script_text([(key, params)], {}).splitlines()[-1]
+        assert parse_script_line(line) == (key, params)
+
+
+def test_read_script_skips_comments_and_blank_lines(tmp_path):
+    from normalize_tabular_data.io import read_script
+
+    script = tmp_path / "s.ntd"
+    script.write_text(
+        "# normalize-tabular-data script\n"
+        "# source: employees.csv\n"
+        "\n"
+        '   trim_collapse(columns=["Dept"])   \n'
+        'date_normalize(column = "Hired Date")\n',
+        encoding="ascii",
+    )
+    assert read_script(script) == [
+        ("trim_collapse", {"columns": ["Dept"]}),
+        ("date_normalize", {"column": "Hired Date"}),
+    ]
+
+
+def test_read_script_bad_line_names_the_line(tmp_path):
+    from normalize_tabular_data.io import read_script
+
+    script = tmp_path / "s.ntd"
+    script.write_text('# hi\ntrim_collapse(columns=["a"])\nfrobnicate(x\n')
+    with pytest.raises(ValueError, match="line 3.*not an operation line"):
+        read_script(script)
+
+
+def test_play_script_line_rejects_non_json_values():
+    from normalize_tabular_data.io import parse_script_line
+
+    with pytest.raises(ValueError, match="bad value for 'value'"):
+        parse_script_line('fill_nulls(columns=["A"], value=starts_or_not)')

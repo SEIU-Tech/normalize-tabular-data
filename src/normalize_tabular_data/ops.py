@@ -218,6 +218,11 @@ RENAME_OP = Operation(
     apply=lambda df, p: df.rename({p["column"]: p["new_name"]}),
 )
 
+# The script player resolves against this: every chooser op plus the internal
+# rename op (header-click renames are logged under the key "rename_single",
+# so saved scripts contain those lines and have to play back).
+PLAY_REGISTRY: dict[str, Operation] = {**OP_REGISTRY, RENAME_OP.key: RENAME_OP}
+
 
 # --- pipeline ---------------------------------------------------------------
 

@@ -26,6 +26,7 @@ Launch with `normalize-tabular-data`. Keys:
 |-----|-----------------------------|
 | `f` | (F)ile — open a file        |
 | `o` | (O)peration — choose an op  |
+| `p` | (P)lay script — reapply a saved `.ntd` sequence |
 | `u` | (U)ndo last applied step    |
 | `r` | (R)edo                      |
 | `s` | (S)ave the data in a format |
@@ -69,6 +70,16 @@ The script is plain ASCII text, one operation per line, e.g.:
 trim_collapse(columns=["Dept", "Name"])
 date_normalize(column="Hired Date")
 ```
+
+## Playing a script back
+
+Press `p` (available while a file is loaded) to pick a script file: the
+dialog previews the highlighted `.ntd` file (syntax-highlighted, first 40
+lines) before you confirm. Its operations are applied, in order, to the table you have open. If any step
+cannot be performed against the currently loaded file — a column it
+renames, trims or splits is missing, the operation is unknown — playing
+stops with an alert naming the failing step, and every step the script had
+already applied is rolled back, so the table is left exactly as it was.
 
 ![TUI preview](docs/screenshot.png)
 

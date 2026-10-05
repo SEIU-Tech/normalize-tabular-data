@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import polars as pl
@@ -130,3 +131,57 @@ def write_script(
     path.write_text(
         script_text(steps, header_fields), encoding="ascii", errors="replace"
     )
+
+
+_SCRIPT_LINE_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\((.*)\)")
+_PARAM_NAME_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*=\s*")
+
+
+def parse_script_line(line: str) -> tuple[str, dict]:
+    """Parse one `key(param=<json value>, ...)` operation description.
+
+    Values are plain JSON literals, so each parameter is read with a
+    JSON decoder (no evaluation). Raises ValueError on anything else."""
+    match = _SCRIPT_LINE_RE.fullmatch(line.strip())
+    if match is None:
+        raise ValueError(f"not an operation line: {line!r}")
+    key, args = match.group(1), match.group(2)
+    decoder = json.JSONDecoder()
+    params: dict = {}
+    pos = 0
+    n = len(args)
+    while pos < n:
+        name_match = _PARAM_NAME_RE.match(args, pos)
+        if name_match is None:
+            raise ValueError(f"missing parameter value in: {line!r}")
+        name = name_match.group(1)
+        pos = name_match.end()
+        try:
+            params[name], pos = decoder.raw_decode(args, pos)
+        except json.JSONDecodeError:
+            raise ValueError(f"bad value for {name!r} in: {line!r}") from None
+        while pos < n and args[pos] in " \t":
+            pos += 1
+        if pos < n and args[pos] == ",":
+            pos += 1
+            while pos < n and args[pos] in " \t":
+                pos += 1
+        elif pos < n:
+            raise ValueError(f"expected ',' between parameters in: {line!r}")
+    return key, params
+
+
+def read_script(path: Path) -> list[tuple[str, dict]]:
+    """Read an operation script: one (key, params) step per non-comment line."""
+    steps: list[tuple[str, dict]] = []
+    for lineno, raw in enumerate(
+        path.read_text(encoding="ascii", errors="replace").splitlines(), 1
+    ):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        try:
+            steps.append(parse_script_line(line))
+        except ValueError as exc:
+            raise ValueError(f"{path.name} line {lineno}: {exc}") from exc
+    return steps
