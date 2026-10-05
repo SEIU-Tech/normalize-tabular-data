@@ -6,6 +6,7 @@ import bisect
 import datetime as _dt
 import random
 from pathlib import Path
+from platformdirs import user_config_dir
 from typing import Any, Iterable
 
 from textual import on
@@ -43,6 +44,7 @@ from normalize_tabular_data.screens import (
 from normalize_tabular_data.widgets import ColumnSidebar, MenuFooter, StepsBar
 
 PREVIEW_ROWS = 250
+APP_CONFIG_NAME = "normalize-tabular-data"
 
 
 class CommandMenu(CommandPalette):
@@ -135,10 +137,19 @@ class OpChooserModal(ModalDialog):
 
     def _marked_title(self, op_key: str, title: str, hotkey: str = "") -> str:
         """Return "Normalize (d)ates"-style markup: the op's hotkey letter
-        highlighted where it sits in the title (keeping its case). Ops
-        without a designated hotkey claim the first unused letter in the
-        title instead; plain title if no letter can be claimed."""
+        highlighted where it sits in the title (keeping its case). A title
+        that already parenthesizes its letter ("Normalize date(t)imes")
+        highlights the letter between the parens; a plain title matches
+        its first occurrence and adds the parens. Ops without a designated
+        hotkey claim the first unused letter in the title instead; plain
+        title if no letter can be claimed."""
         if hotkey:
+            i = title.lower().find(f"({hotkey.lower()})")
+            if i >= 0:
+                # the letter to claim sits inside existing parentheses:
+                # highlight it without adding a second pair
+                self._hotkeys[title[i + 1].lower()] = op_key
+                return f"{title[: i + 1]}[cyan]{title[i + 1]}[/cyan]{title[i + 2:]}"
             i = title.lower().find(hotkey.lower())
         else:
             i = next(
@@ -275,8 +286,15 @@ class NormalizeApp(App[None]):
         self,
         initial_file: str | Path | None = None,
         initial_script: str | Path | None = None,
+        config_dir: Path | None = None,
     ) -> None:
         super().__init__()
+        # where the chosen theme (and any future settings) are stored;
+        # None means the per-user platform directory
+        self._config_dir = config_dir
+        # flips to True at on_mount: only theme changes made after are the
+        # user's and only those are persisted
+        self._app_ready = False
         # filesystem path to open when the app starts (the optional file
         # named on the command line); loaded like a file chosen in-app
         self.initial_file: Path | None = (
@@ -354,6 +372,9 @@ class NormalizeApp(App[None]):
         return list(self.pipeline.current().columns)
 
     def on_mount(self) -> None:
+        # remember this point so theme changes from here on are the
+        # user's own choices and get persisted
+        self._apply_saved_theme()
         self.push_screen(MainScreen())
         self._refresh_steps()
         # the command line's file, if any, is opened once the main screen
@@ -361,6 +382,46 @@ class NormalizeApp(App[None]):
         # crashing if it is unreadable or has an unsupported format
         if self.initial_file is not None:
             self.call_after_refresh(self.load_path, self.initial_file)
+        self._app_ready = True
+
+    # --- theme persistence ---------------------------------------------
+
+    def watch_theme(self, theme_name: str) -> None:
+        """Persist every theme the user chooses (menu or command), so the
+        next launch opens with it again. Skipped while headless, so the
+        pilot tests cannot touch the real configuration; skipped before
+        mount, where only the reactive's default applies."""
+        if self._app_ready and not self.is_headless:
+            try:
+                self._theme_config_path().parent.mkdir(parents=True, exist_ok=True)
+                self._theme_config_path().write_text(
+                    theme_name + "\n", encoding="utf-8"
+                )
+            except OSError:
+                pass  # unwritable config location: run without remembering
+
+    def _apply_saved_theme(self) -> None:
+        """Restore the theme chosen in a previous session, if it still exists.
+
+        Skipped in headless runs that use the real configuration location
+        (pilot tests): an eyeballing developer's own saved theme should
+        not leak into supposedly default-themed tests. A headless run
+        given an explicit config_dir is a deliberate fixture and loads it."""
+        if self.is_headless and self._config_dir is None:
+            return
+        try:
+            saved = self._theme_config_path().read_text(encoding="utf-8").strip()
+        except OSError:
+            return
+        if not saved:
+            return
+        try:
+            self.theme = saved
+        except Exception:
+            pass  # a theme name that no longer exists: keep the default
+
+    def _theme_config_path(self) -> Path:
+        return (self._config_dir or Path(user_config_dir(APP_CONFIG_NAME))) / "theme"
 
     # --- data plumbing ---------------------------------------------------
 

@@ -103,17 +103,22 @@ Launch with `normalize-tabular-data`. Keys:
 
 ## Operations
 
-- **Normalize dates** — parse a messy date column of *any* input format into
-  canonical UTC `year-month-dayThh:mm:ss` values (second resolution;
-  fractional parts are truncated); unparseable values become null.
+- **Normalize date(t)imes** — parse a messy date column of *any* input
+  format into canonical UTC datetimes at millisecond resolution;
+  unparseable values become null. CSV/TSV/JSONLines export serializes
+  datetime columns as second-resolution `year-month-dayThh:mm:ss`
+  strings; Parquet and Excel keep the real datetime values.
+- **Normalize (d)ates** — the same match-anything parsing, condensed to
+  the UTC calendar date: the column becomes date-only ISO-8601
+  (`year-month-day`); unparseable values become null.
 - **Trim whitespace** — strip edges and collapse internal whitespace runs,
   per selected columns.
 - Rename a column — click its header in the preview and type the new name.
-- **Deduplicate rows** — on all or selected columns, keeping first or last.
 - **Combine columns** — concatenate two or more columns with a separator.
 - **Split column** — break one column into `{col}_1..{col}_k`; a blank
   delimiter splits on runs of whitespace.
 - **Remove columns** — drop selected columns entirely.
+- **Deduplicate rows** — on all or selected columns, keeping first or last.
 
 ## Formats
 
@@ -128,7 +133,9 @@ still runs on the full data.
 Every open file keeps an internal log of the operations performed on it. When
 saving, the dialog offers a **Save sequence of operations?** checkbox
 (unticked by default); with it ticked, a second dialog asks where to write
-the script — suggested `<table>.ntd`, any other extension you type is kept.
+the script — suggested `<table>.ntd`; scripts always use the `.ntd`
+extension, so the name you type is saved with that suffix whatever it
+ends in.
 
 The script is plain ASCII text, one operation per line, e.g.:
 

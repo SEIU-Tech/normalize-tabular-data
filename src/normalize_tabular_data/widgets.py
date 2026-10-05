@@ -92,13 +92,13 @@ class ColumnSidebar(Widget):
 
 
 def _dtype_mark(dtype: str) -> str:
-    """Compact 3-wide dtype mark for the sidebar: dt (datetime/date),
-    str (string), int (integer), dec (float/decimal), t/f (boolean);
-    everything else oth. Each mark is padded to 3 columns so column
-    names left-align."""
+    """Compact 3-wide dtype mark for the sidebar: dt (datetime),
+    day (date-only), str (string), int (integer), dec (float/decimal),
+    t/f (boolean); everything else oth. Each mark is padded to 3 columns
+    so column names left-align."""
     for prefix, mark in (
         ("Datetime", "dt "),
-        ("Date", "dt "),
+        ("Date", "day"),
         ("Time", "dt "),
         ("String", "str"),
         ("Categorical", "str"),

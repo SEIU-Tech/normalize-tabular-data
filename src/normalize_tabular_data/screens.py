@@ -363,7 +363,11 @@ class OpParamsModal(ModalDialog):
 
     def compose_body(self) -> ComposeResult:
         self.widgets: dict[str, object] = {}
-        candidates = self._date_candidates() if self.op.key == "date_normalize" else []
+        candidates = (
+            self._date_candidates()
+            if self.op.key in ("date_normalize", "date_only")
+            else []
+        )
         for spec in self.op.params:
             if spec.kind == "column_multi":
                 sel = SelectionList(
@@ -531,8 +535,8 @@ class SaveModal(ModalDialog):
 class ScriptNameModal(ModalDialog):
     """Name the '.ntd' script file when saving a sequence of operations.
 
-    The default carries the .ntd extension; typing a different one saves
-    under that extension instead."""
+    The extension is always .ntd: whatever the user types, the saved name
+    ends in the fixed script suffix."""
 
     dialog_title = "Save script"
 
@@ -547,17 +551,14 @@ class ScriptNameModal(ModalDialog):
             id="script_input",
         )
         yield self.path_input
-        yield Static(
-            f"Default extension: {SCRIPT_SUFFIX} — type another to override",
-            classes="help",
-        )
+        yield Static(f"Scripts always end in {SCRIPT_SUFFIX}", classes="help")
 
     def action_ok(self) -> None:
         raw = self.path_input.value.strip()
         if not raw:
             self.app.notify("Type a script file name or path", severity="error")
             return
-        target = Path(raw).expanduser()
+        target = Path(raw).expanduser().with_suffix(SCRIPT_SUFFIX)
         if target.exists():
             self.app.notify("Script file exists: pick another name", severity="warning")
             return
