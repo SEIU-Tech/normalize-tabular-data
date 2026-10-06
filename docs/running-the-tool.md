@@ -30,7 +30,7 @@ Download `normalize-tabular-data.sh` and `normalize-tabular-data.icns`
    not right-click/save). Save into `Downloads/`.
 3. Go back one page, click `normalize-tabular-data.icns`, and download it the
    same way.
-4. Open the Terminal app: press ⌘+<space>, type `Terminal`, press Enter.
+4. Open the Terminal app: press ⌘+&lt;space&gt;, type `Terminal`, press Enter.
 5. Type these four lines, pressing Enter after each (you can drag the
    downloaded files' icons into the Terminal window instead of typing
    their names, which also spares you spelling mistakes):
@@ -48,8 +48,8 @@ Download `normalize-tabular-data.sh` and `normalize-tabular-data.icns`
 6. A `Normalize Tabular Data.app` appears on the Desktop. Double-click
    it; its first run downloads uv and nothing else.
 7. [Optional] the NTD application has windows, mouse control, buttons, etc.,
-   but still runs in a terminal. To resize the font, use ⌘+<plus> and ⌘+<minus>
-   (same as in a web browser and other applications).
+   but still runs in a terminal. To resize the font, use ⌘+&lt;plus&gt; and 
+   ⌘+&lt;minus&gt; (same as in a web browser and other applications).
 
 ### Windows
 
