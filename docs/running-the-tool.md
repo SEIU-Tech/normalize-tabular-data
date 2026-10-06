@@ -6,36 +6,34 @@ it (`uv tool install`, `uvx`, a git checkout).
 
 ## Novice edition
 
-Apologies that the next few steps are slightly hackerish. But simply 
-following the instructions should suffice not to have to touch the 
-terminal again thereafter.
+Apologies that the next few steps are slightly hackerish. Simply following the
+instructions should suffice not to have to touch the terminal again thereafter.
 
-Both files live in `launchers/` of the GitHub repository
-(<https://github.com/SEIU-Tech/normalize-tabular-data>).
+Both files live in the `launchers/` directory of this repository: 
+<https://github.com/SEIU-Tech/normalize-tabular-data/tree/main/launchers>.
 
-You'll want to download two files the launcher plus its icon image. The
-icon file is optional: with only the launcher, `--add-shortcut` still 
-installs a working desktop icon — it just shows the platform's default 
-icon (and the Windows side skips the icon pass silently). So the true 
-one-file minimum gets you a functional icon; the second file buys
-the custom art. 
+You'll want to download two files: the launcher plus its icon image. 
 
-For each platform below, download **two files into one folder** (e.g.
-your usual `Downloads` folder) and leave them side by side — the icon
-must sit next to the launcher when you run the install command.
+With only the launcher, `--add-shortcut` still installs a working desktop icon
+— it just uses the platform's default icon. The script gets you a launcher;
+the icon file gets you the custom art. 
+
+For each platform below, download both files into one folder (e.g. your usual
+`Downloads/` folder) and leave them side by side — the icon must sit next to 
+the launcher when you run the install command.
 
 
-**macOS: download `normalize-tabular-data.sh` and
-`normalize-tabular-data.icns`**
+### macOS
+
+Download `normalize-tabular-data.sh` and `normalize-tabular-data.icns`
 
 1. Open the `launchers` folder page in your browser.
-2. Click `normalize-tabular-data.sh`, then click the
-   **Download raw file** button on the file page's toolbar (an arrow
-   pointing down into a tray — not right-click/save). Save into
-   `Downloads`.
-3. Go back one page, click `normalize-tabular-data.icns`, and download
-   it the same way.
-4. Open the Terminal app: press ⌘ + space, type `Terminal`, press Enter.
+2. Click `normalize-tabular-data.sh`, then click the "Download raw file" 
+   button on the file page's toolbar (an arrow pointing down into a tray — 
+   not right-click/save). Save into `Downloads/`.
+3. Go back one page, click `normalize-tabular-data.icns`, and download it the
+   same way.
+4. Open the Terminal app: press ⌘+<space>, type `Terminal`, press Enter.
 5. Type these four lines, pressing Enter after each (you can drag the
    downloaded files' icons into the Terminal window instead of typing
    their names, which also spares you spelling mistakes):
@@ -52,9 +50,13 @@ must sit next to the launcher when you run the install command.
    ask for a security confirmation on each of the icon pieces.
 6. A `Normalize Tabular Data.app` appears on the Desktop. Double-click
    it; its first run downloads uv and nothing else.
+7. [Optional] the NTD application has windows, mouse control, buttons, etc.,
+   but still runs in a terminal. To resize the font, use ⌘+<plus> and ⌘+<minus>
+   (same as in a web browser and other applications).
 
-**Windows: download `normalize-tabular-data.cmd` and
-`normalize-tabular-data.ico`**
+### Windows
+
+Download `normalize-tabular-data.cmd` and `normalize-tabular-data.ico`
 
 1. Same page, click `normalize-tabular-data.cmd` → **Download raw
    file** → save into `Downloads`; then do
