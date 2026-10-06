@@ -9,19 +9,16 @@ it (`uv tool install`, `uvx`, a git checkout).
 Apologies that the next few steps are slightly hackerish. Simply following the
 instructions should suffice not to have to touch the terminal again thereafter.
 
+You'll want to download the launcher plus its icon image. The icon file 
+is optional: with only the launcher, `--add-shortcut` still installs a 
+working desktop icon — it just shows the platform's default icon.
+
 Both files live in the `launchers/` directory of this repository: 
 <https://github.com/SEIU-Tech/normalize-tabular-data/tree/main/launchers>.
-
-You'll want to download two files: the launcher plus its icon image. 
-
-With only the launcher, `--add-shortcut` still installs a working desktop icon
-— it just uses the platform's default icon. The script gets you a launcher;
-the icon file gets you the custom art. 
 
 For each platform below, download both files into one folder (e.g. your usual
 `Downloads/` folder) and leave them side by side — the icon must sit next to 
 the launcher when you run the install command.
-
 
 ### macOS
 
