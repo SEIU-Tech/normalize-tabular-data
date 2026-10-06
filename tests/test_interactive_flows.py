@@ -145,7 +145,7 @@ async def test_open_via_directory_listing(sample_data_dir, sample_csv_path):
         assert current.height == 6
         assert current.columns == ["member_id", "Hired Date", "Dept", "Name", "Zip"]
 
-        # polars-backed preview rendered in the main window
+        # Polars-backed preview rendered in the main window
         table = app.screen.query_one("#preview", DataTable)
         assert table.row_count == 6
         assert len(table.columns) == 5

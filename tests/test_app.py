@@ -58,7 +58,7 @@ async def test_unreadable_files_show_message_not_crash(tmp_path):
     bad_xlsx = tmp_path / "fake.xlsx"
     bad_xlsx.write_bytes(b"this is not an excel file at all")
     garbage_csv = tmp_path / "garbage.csv"
-    # rows with more fields than the header -> polars ComputeError
+    # rows with more fields than the header -> Polars ComputeError
     garbage_csv.write_bytes(b"a,b\n1,2\n1,2,3,4\n")
 
     app = NormalizeApp()

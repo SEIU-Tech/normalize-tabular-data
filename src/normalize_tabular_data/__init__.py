@@ -1,4 +1,4 @@
-"""normalize-tabular-data: TUI for normalizing tabular data with polars."""
+"""normalize-tabular-data: TUI for normalizing tabular data with Polars."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 
 
 def _run_script(path: Path, script_path: Path, output: Path | None) -> int:
@@ -145,7 +145,8 @@ def main() -> None:
     except ImportError as exc:  # helpful message if an optional engine is missing
         print(
             f"normalize-tabular-data is missing a dependency ({exc}).\n"
-            "Reinstall with: uv tool install --force --reinstall normalize-tabular-data",
+            "Reinstall with: "
+            "uv tool install --force --reinstall normalize-tabular-data",
             file=sys.stderr,
         )
         raise SystemExit(1)

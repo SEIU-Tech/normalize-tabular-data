@@ -1,6 +1,6 @@
 """Normalization engine: operation registry and re-computing pipeline.
 
-Pure polars — no Textual imports here, so the whole engine is testable
+Pure Polars — no Textual imports here, so the whole engine is testable
 without a terminal.
 """
 

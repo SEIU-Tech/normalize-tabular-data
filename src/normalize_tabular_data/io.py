@@ -1,4 +1,4 @@
-"""Format dispatch: suffix -> polars read/write. No Textual imports."""
+"""Format dispatch: suffix -> Polars read/write. No Textual imports."""
 
 from __future__ import annotations
 
