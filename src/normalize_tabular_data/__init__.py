@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-__version__ = "0.1.5"
+__version__ = "0.2.0"
 
 
 def _run_script(path: Path, script_path: Path, output: Path | None) -> int:

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import chardet
 import json
 import re
+from io import BytesIO
 from pathlib import Path
 
 import polars as pl
@@ -41,17 +43,55 @@ def detect_format(path: Path) -> str:
     return fmt
 
 
+# bytes probed for encoding detection; large files stay fast
+_SNIFF_BYTES = 100_000
+
+
+def _decoded_text(data: bytes) -> bytes:
+    """`data`, transcoded to UTF-8 (polars parses text formats as UTF-8 only).
+
+    Already-valid UTF-8 (the common case) passes through untouched. Anything
+    else is decoded with the encoding chardet sniffs from the leading bytes
+    -- ISO 8859-3, Windows-1256, Shift_JIS-2004, UTF-16, etc. -- and
+    re-encoded. When sniffer or decodng fails, an errors=replace decode
+    keeps the load alive instead of erroring out."""
+    if not data:
+        return data
+    if data.startswith(b"\xef\xbb\xbf"):  # UTF-8 BOM
+        data = data[3:]
+    try:
+        data.decode("utf-8")
+        return data
+    except UnicodeDecodeError:
+        pass
+    encoding = chardet.detect(data[:_SNIFF_BYTES])["encoding"]
+    try:
+        decoded = data.decode(encoding)
+    except (LookupError, UnicodeDecodeError):
+        decoded = data.decode("utf-8", errors="replace")
+    return decoded.removeprefix("﻿").encode()
+
+
 def _read_tabular(path: Path, separator: str = ",") -> pl.DataFrame:
     """CSV/TSV read with a retry fallback.
 
     Inference looks at up to 10,000 rows; dtype-incompatible values can
     still appear later in a large file and fail parsing. When that happens,
     re-read with zero-length inference so every column stays String instead
-    of erroring out."""
+    of erroring out. The same retry also covers a non-UTF-8 encoding: the
+    sniffer (`_decoded_text`) transcoded the bytes to UTF-8."""
     try:
         return pl.read_csv(path, separator=separator, infer_schema_length=10_000)
     except pl.exceptions.PolarsError:
-        return pl.read_csv(path, separator=separator, infer_schema_length=0)
+        data = _decoded_text(path.read_bytes())
+        try:
+            return pl.read_csv(
+                BytesIO(data), separator=separator, infer_schema_length=10_000
+            )
+        except pl.exceptions.PolarsError:
+            return pl.read_csv(
+                BytesIO(data), separator=separator, infer_schema_length=0
+            )
 
 
 def read_table(path: Path, fmt: str, sheet: str | None = None) -> pl.DataFrame:
@@ -61,7 +101,10 @@ def read_table(path: Path, fmt: str, sheet: str | None = None) -> pl.DataFrame:
     if fmt == "tsv":
         return _read_tabular(path, separator="\t")
     if fmt == "jsonl":
-        return pl.read_ndjson(path)
+        try:
+            return pl.read_ndjson(path)
+        except pl.exceptions.PolarsError:
+            return pl.read_ndjson(BytesIO(_decoded_text(path.read_bytes())))
     if fmt == "parquet":
         return pl.read_parquet(path)
     if fmt == "xlsx":

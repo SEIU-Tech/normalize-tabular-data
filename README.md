@@ -18,6 +18,11 @@ combine/split columns, drop columns), then save the cleaned result.
 Reads: CSV, TSV, JSON lines, Parquet, Excel (`.xlsx`/`.xls` — first sheet).
 Writes: CSV, TSV, JSON lines, Parquet, Excel (`.xlsx`).
 
+Text formats are parsed as UTF-8; a file that is not (ISO 8859-3,
+Windows-1256, Shift_JIS-2004, UTF-16, ...) has its encoding sniffed with
+[chardet](https://pypi.org/project/chardet/) and is transcoded to UTF-8
+before parsing.
+
 Large files are previewed with a random sample of 250 rows; every operation
 still runs on the full data.
 
