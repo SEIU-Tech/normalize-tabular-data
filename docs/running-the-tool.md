@@ -11,7 +11,7 @@ instructions should suffice not to have to touch the terminal again thereafter.
 
 You'll want to download the launcher plus its icon image. The icon file 
 is optional: with only the launcher, `--add-shortcut` still installs a 
-working desktop icon — it just shows the platform's default icon.
+working desktop icon—it just shows the platform's default icon.
 
 Both files live in the `launchers/` directory of this repository: 
 <https://github.com/SEIU-Tech/normalize-tabular-data/tree/main/launchers>.
@@ -26,8 +26,7 @@ Download `normalize-tabular-data.sh` and `normalize-tabular-data.icns`
 
 1. Open the `launchers` folder page in your browser.
 2. Click `normalize-tabular-data.sh`, then click the "Download raw file" 
-   button on the file page's toolbar (an arrow pointing down into a tray — 
-   not right-click/save). Save into `Downloads/`.
+   button on the file page's toolbar. Save into `Downloads/`.
 3. Go back one page, click `normalize-tabular-data.icns`, and download it the
    same way.
 4. Open the Terminal app: press ⌘+&lt;space&gt;, type `Terminal`, press Enter.
@@ -42,11 +41,11 @@ Download `normalize-tabular-data.sh` and `normalize-tabular-data.icns`
    ./normalize-tabular-data.sh --add-shortcut
    ```
 
-   Line 2 clears the "downloaded from the internet" tag macOS puts on
-   files fetched in a browser; without it, the first double-click will
-   ask for a security confirmation on each of the icon pieces.
-6. A `Normalize Tabular Data.app` appears on the Desktop. Double-click
-   it; its first run downloads uv and nothing else.
+   Line 2 clears the "downloaded from the internet" tag macOS puts on files
+   fetched in a browser; without it, the first double-click will ask for a 
+   security confirmation on each of the icon pieces.
+6. A `Normalize Tabular Data.app` appears on the Desktop. Double-click it; 
+   its first run downloads `uv`.
 7. [Optional] the NTD application has windows, mouse control, buttons, etc.,
    but still runs in a terminal. To resize the font, use ⌘+&lt;plus&gt; and 
    ⌘+&lt;minus&gt; (same as in a web browser and other applications).
@@ -55,24 +54,23 @@ Download `normalize-tabular-data.sh` and `normalize-tabular-data.icns`
 
 Download `normalize-tabular-data.cmd` and `normalize-tabular-data.ico`
 
-1. Same page, click `normalize-tabular-data.cmd` → **Download raw
-   file** → save into `Downloads`; then do
-   `normalize-tabular-data.ico`. If the browser pops a warning like
-   "this file type can harm your computer", choose **Keep** — a `.cmd`
-   is just a text script, and this one is a plain, readable file.
+1. From `launchers/` directory, click `normalize-tabular-data.cmd` → 
+   "Download raw file" → save into `Downloads`; then download 
+   `normalize-tabular-data.ico` in the same manner. If the browser pops a 
+   warning like "this file type can harm your computer", choose "Keep".
 2. Open Command Prompt: click the **Start** button (or press ⊞ Win),
    type `cmd`, press Enter.
-3. In the black window, type these two lines, pressing Enter after each:
+3. In the terminal window, type these two lines, pressing Enter after each:
 
    ```bat
    cd %USERPROFILE%\Downloads
    normalize-tabular-data.cmd --add-shortcut
    ```
 
-4. A shortcut named **Normalize Tabular Data** appears on the Desktop.
+4. A shortcut named "Normalize Tabular Data" appears on the Desktop.
    Double-click it to run (the `.ico` must stay next to the `.cmd` in
-   `Downloads`, and the `.cmd` must not be renamed or moved — the
-   shortcut remembers where they both live).
+   `Downloads`, and the `.cmd` must not be renamed or moved—the shortcut 
+   remembers where they both live).
 
 ## Programmer edition
 
