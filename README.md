@@ -1,52 +1,74 @@
-# normalize-tabular-data
+# normalize-tabular-data (NTD)
 
 A terminal UI (Textual) for interactively normalizing tabular data, backed by
 [polars](https://pola.rs) for speed and
 [gnosis-date-parser](https://pypi.org/project/gnosis-date-parser/) for fuzzy
 date parsing at Rust speed.
 
+NTD also supports purely command-line operations for use in scripting, launched
+with `uvx` with no other requirements that are not dynamically downloaded.
+
 Load a file, see a preview, build up a pipeline of normalization operations
 (normalize messy dates, trim whitespace, rename a column, deduplicate,
-combine/split columns, drop columns), then save the
-cleaned result.
+combine/split columns, drop columns), then save the cleaned result.
+
+## Formats
+
+Reads: CSV, TSV, JSON lines, Parquet, Excel (`.xlsx`/`.xls` — first sheet).
+Writes: CSV, TSV, JSON lines, Parquet, Excel (`.xlsx`).
+
+Large files are previewed with a random sample of 250 rows; every operation
+still runs on the full data.
+
+## Running the Text User Interface
 
 ![TUI preview](https://raw.githubusercontent.com/SEIU-Tech/normalize-tabular-data/main/docs/screenshot.png)
 
-## Running
+Installation and launch options — persistent install, ephemeral `uvx`
+runs, running from a git checkout, the single-file launchers for
+Linux/macOS/Windows, and installing them as desktop icons — are
+described in [docs/running-the-tool.md](docs/running-the-tool.md).
 
-### Persistent install
+## Capabilities in the TUI
 
-```bash
-uv tool install normalize-tabular-data
-# upgrade later with:
-uv tool upgrade normalize-tabular-data
-```
+Launch with `uvx normalize-tabular-data` (or a launcher). Keys:
 
-### Ephemeral run (no install)
 
-`uvx` fetches into a throwaway environment each time:
+| Key | Action                       |
+|-----|------------------------------|
+| `f` | (F)ile — open a file         |
+| `o` | (O)peration — choose an op   |
+| `p` | (P)lay script — apply `.ntd` |
+| `u` | (U)ndo last applied step     |
+| `r` | (R)edo                       |
+| `s` | (S)ave the data in a format  |
+| `q` | (Q)uit                       |
 
-```bash
-uvx normalize-tabular-data
-# pin a specific version:
-uvx normalize-tabular-data==0.1.1
-```
+## Operations
 
-### From a git checkout
+- **Normalize date(t)imes** — parse a messy date column of *any* input
+  format into canonical UTC datetimes at millisecond resolution;
+  unparseable values become null. CSV/TSV/JSONLines export serializes
+  datetime columns as second-resolution `year-month-dayThh:mm:ss`
+  strings; Parquet and Excel keep the real datetime values.
+- **Normalize (d)ates** — the same match-anything parsing, condensed to
+  the UTC calendar date: the column becomes date-only ISO-8601
+  (`year-month-day`); unparseable values become null.
+- **Trim whitespace** — strip edges and collapse internal whitespace runs,
+  per selected columns.
+- Rename a column — click its header in the preview and type the new name.
+- **Combine columns** — concatenate two or more columns with a separator.
+- **Split column** — break one column into `{col}_1..{col}_k`; a blank
+  delimiter splits on runs of whitespace.
+- **Remove columns** — drop selected columns entirely.
+- **Deduplicate rows** — on all or selected columns, keeping first or last.
 
-Within the directory of the cloned repository:
-
-```bash
-uv run normalize-tabular-data
-```
-
-## Command line
+## Command line usage
 
 An optional `FILE` argument names a table to open at startup, as if you
 had picked it from the in-app dialog.
 
 ```bash
-normalize-tabular-data data/members.csv      # or with uvx/uv run
 uvx normalize-tabular-data data/members.tsv
 ```
 
@@ -86,47 +108,6 @@ With `-o -` (attached `-o-` works too), the transformed table is written
 to stdout itself and the step lines are suppressed, so stdout carries
 only the data. After a successful run the confirmation line goes to
 stderr.
-
-## Usage
-
-Launch with `normalize-tabular-data`. Keys:
-
-| Key | Action                       |
-|-----|------------------------------|
-| `f` | (F)ile — open a file         |
-| `o` | (O)peration — choose an op   |
-| `p` | (P)lay script — apply `.ntd` |
-| `u` | (U)ndo last applied step     |
-| `r` | (R)edo                       |
-| `s` | (S)ave the data in a format  |
-| `q` | (Q)uit                       |
-
-## Operations
-
-- **Normalize date(t)imes** — parse a messy date column of *any* input
-  format into canonical UTC datetimes at millisecond resolution;
-  unparseable values become null. CSV/TSV/JSONLines export serializes
-  datetime columns as second-resolution `year-month-dayThh:mm:ss`
-  strings; Parquet and Excel keep the real datetime values.
-- **Normalize (d)ates** — the same match-anything parsing, condensed to
-  the UTC calendar date: the column becomes date-only ISO-8601
-  (`year-month-day`); unparseable values become null.
-- **Trim whitespace** — strip edges and collapse internal whitespace runs,
-  per selected columns.
-- Rename a column — click its header in the preview and type the new name.
-- **Combine columns** — concatenate two or more columns with a separator.
-- **Split column** — break one column into `{col}_1..{col}_k`; a blank
-  delimiter splits on runs of whitespace.
-- **Remove columns** — drop selected columns entirely.
-- **Deduplicate rows** — on all or selected columns, keeping first or last.
-
-## Formats
-
-Reads: CSV, TSV, JSON lines, Parquet, Excel (`.xlsx`/`.xls` — first sheet).
-Writes: CSV, TSV, JSON lines, Parquet, Excel (`.xlsx`).
-
-Large files are previewed with a random sample of 250 rows; every operation
-still runs on the full data.
 
 ## Operation scripts (`.ntd`)
 
