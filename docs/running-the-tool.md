@@ -10,23 +10,23 @@ Apologies that the next few steps are slightly hackerish. But simply
 following the instructions should suffice not to have to touch the 
 terminal again thereafter.
 
-Both files live in `launchers/` of the GitHub repository
+The two files you want live in `launchers/` in the GitHub repository
 (<https://github.com/SEIU-Tech/normalize-tabular-data>).
 
-You'll want to download two files the launcher plus its icon image. The
-icon file is optional: with only the launcher, `--add-shortcut` still 
-installs a working desktop icon — it just shows the platform's default 
-icon (and the Windows side skips the icon pass silently). So the true 
-one-file minimum gets you a functional icon; the second file buys
-the custom art. 
+You'll want to download the launcher plus its icon image. The icon file 
+is optional: with only the launcher, `--add-shortcut` still installs a 
+working desktop icon — it just shows the platform's default icon (and the
+Windows side skips the icon pass silently). So the true one-file minimum 
+gets you a functional icon; the second file buys the custom art. 
 
 For each platform below, download **two files into one folder** (e.g.
 your usual `Downloads` folder) and leave them side by side — the icon
 must sit next to the launcher when you run the install command.
 
 
-**macOS: download `normalize-tabular-data.sh` and
-`normalize-tabular-data.icns`**
+### macOS
+
+Download `normalize-tabular-data.sh` and `normalize-tabular-data.icns`
 
 1. Open the `launchers` folder page in your browser.
 2. Click `normalize-tabular-data.sh`, then click the
@@ -53,8 +53,9 @@ must sit next to the launcher when you run the install command.
 6. A `Normalize Tabular Data.app` appears on the Desktop. Double-click
    it; its first run downloads uv and nothing else.
 
-**Windows: download `normalize-tabular-data.cmd` and
-`normalize-tabular-data.ico`**
+### Windows
+
+Download `normalize-tabular-data.cmd` and `normalize-tabular-data.ico`
 
 1. Same page, click `normalize-tabular-data.cmd` → **Download raw
    file** → save into `Downloads`; then do
