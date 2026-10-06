@@ -1,6 +1,6 @@
 [project]
 name = "normalize-tabular-data"
-version = "0.1.5"
+version = "0.2.0"
 description = "TUI for normalizing tabular data with Polars"
 readme = "README.md"
 license = "BSD-2-Clause"
@@ -16,6 +16,7 @@ dependencies = [
     "fastexcel>=0.10",
     "xlsxwriter>=0.9",
     "platformdirs>=3.0",
+    "chardet>=7.0.0",
 ]
 
 [dependency-groups]
