@@ -230,6 +230,17 @@ async def test_footer_renders_menu_style(csv_path):
         await pilot.press("q")
 
 
+async def test_header_labels_app_with_version(csv_path):
+    """The header's docked label reads "normalize-tabular-data <version>"."""
+    from normalize_tabular_data import __version__
+    from normalize_tabular_data.app import AppHeader
+
+    app = NormalizeApp()
+    async with app.run_test() as pilot:
+        label = app.screen.query_one(AppHeader).query_one(".app_name")
+        assert label.render().plain == f"normalize-tabular-data {__version__}"
+
+
 def test_theme_persists_user_selection(tmp_path):
     """Choosing a theme writes its name to the app's configuration file."""
     from normalize_tabular_data.app import NormalizeApp

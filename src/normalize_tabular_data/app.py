@@ -21,6 +21,7 @@ from textual.screen import Screen
 from textual.widgets import DataTable, Header, Label, ListItem, ListView
 
 from normalize_tabular_data import io
+from normalize_tabular_data import __version__
 from normalize_tabular_data.io import SCRIPT_SUFFIX
 from normalize_tabular_data.ops import (
     OP_REGISTRY,
@@ -207,7 +208,7 @@ class AppHeader(Header):
 
     def compose(self) -> ComposeResult:
         yield from super().compose()
-        yield Label("normalize-tabular-data", classes="app_name")
+        yield Label(f"normalize-tabular-data {__version__}", classes="app_name")
 
 
 class MainScreen(Screen[None]):
