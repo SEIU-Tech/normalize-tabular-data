@@ -1,6 +1,6 @@
 [project]
 name = "normalize-tabular-data"
-version = "0.1.3"
+version = "0.1.4"
 description = "TUI for normalizing tabular data with Polars"
 readme = "README.md"
 license = "BSD-2-Clause"
