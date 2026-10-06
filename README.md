@@ -40,6 +40,48 @@ Within the directory of the cloned repository:
 uv run normalize-tabular-data
 ```
 
+### Single-file launchers
+
+`launchers/` holds two standalone files that both install `uv` (if it is
+not already present) and then run the app through `uvx` — nothing else
+has to be installed first:
+
+- **Linux & macOS** — `normalize-tabular-data.sh`, a POSIX shell script.
+  Make it executable and run it (`chmod +x normalize-tabular-data.sh &&
+  ./normalize-tabular-data.sh`); it needs `curl` or `wget` on the first
+  run to fetch the uv installer.
+- **Windows** — `normalize-tabular-data.cmd`, a batch file. Double-click
+  it or run it from a terminal (`normalize-tabular-data.cmd`); it uses
+  PowerShell (present on all supported Windows systems) to fetch the uv
+  installer, and passes any command-line arguments through to the app.
+
+Both run `uvx normalize-tabular-data`, caching uv and the package after
+the first launch, so the first run needs network access and later runs
+do not.
+
+### Desktop icon
+
+Each launcher can also install itself as a desktop icon that starts the
+application on double-click:
+
+```bash
+# macOS: a "Normalize Tabular Data.command" file on your Desktop
+./normalize-tabular-data.sh --add-shortcut
+```
+
+```bat
+rem Windows: a "Normalize Tabular Data" shortcut on your Desktop
+normalize-tabular-data.cmd --add-shortcut
+```
+
+On macOS the icon is a copy of the shell script given the `.command`
+suffix Finder needs (hand it a better name if you rename the copy); on
+Windows it is a `.lnk` shortcut pointing at wherever the `.cmd` file
+lives, so moving or deleting that file moves or breaks the icon.
+Re-running `--add-shortcut` refreshes the desktop copy. The first
+double-click still installs uv and the package itself if they are
+missing; later launches are cached and offline.
+
 ## Command line
 
 An optional `FILE` argument names a table to open at startup, as if you
