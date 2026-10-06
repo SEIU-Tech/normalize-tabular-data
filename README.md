@@ -3,10 +3,11 @@
 A terminal UI (Textual) for interactively normalizing tabular data, backed by
 [polars](https://pola.rs) for speed and
 [gnosis-date-parser](https://pypi.org/project/gnosis-date-parser/) for fuzzy
-date parsing at Rust speed.
+date parsing at Rust speed. NTD also supports purely command-line operations 
+for use in scripting.
 
-NTD also supports purely command-line operations for use in scripting, launched
-with `uvx` with no other requirements that are not dynamically downloaded.
+**Quick start**: `uvx normalize-tabular-data`. No installation required if
+you have `uv`.
 
 Load a file, see a preview, build up a pipeline of normalization operations
 (normalize messy dates, trim whitespace, rename a column, deduplicate,
