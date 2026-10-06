@@ -27,7 +27,8 @@ still runs on the full data.
 Installation and launch options — persistent install, ephemeral `uvx`
 runs, running from a git checkout, the single-file launchers for
 Linux/macOS/Windows, and installing them as desktop icons — are
-described in [docs/running-the-tool.md](docs/running-the-tool.md).
+described in
+[docs/running-the-tool.md](https://github.com/SEIU-Tech/normalize-tabular-data/blob/main/docs/running-the-tool.md).
 
 ## Capabilities in the TUI
 
@@ -164,4 +165,4 @@ credential aborts the upload instead of prompting mid-run.
 
 BSD 2-Clause. Copyright (c) 2026, Service Employees International Union (SEIU). 
 
-See [LICENSE](LICENSE).
+See [LICENSE](https://github.com/SEIU-Tech/normalize-tabular-data/blob/main/LICENSE).
