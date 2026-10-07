@@ -3,7 +3,7 @@ name = "normalize-tabular-data"
 version = "0.2.0"
 description = "TUI for normalizing tabular data with Polars"
 readme = "README.md"
-license = "BSD-2-Clause"
+license = "0BSD"
 license-files = ["LICENSE"]
 authors = [
     { name = "David Mertz, Ph.D.", email = "mertz@gnosis.cx" }

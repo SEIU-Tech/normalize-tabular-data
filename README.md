@@ -169,6 +169,7 @@ credential aborts the upload instead of prompting mid-run.
 
 ## License
 
-BSD 2-Clause. Copyright (c) 2026, Service Employees International Union (SEIU). 
+Zero-Clause BSD (0BSD). Copyright (c) 2026, Service Employees International
+Union (SEIU).
 
 See [LICENSE](https://github.com/SEIU-Tech/normalize-tabular-data/blob/main/LICENSE).
